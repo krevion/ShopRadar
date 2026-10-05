@@ -1,0 +1,645 @@
+:root {
+  --color-navy: #0d2246;
+  --color-deep-navy: #091c3b;
+  --color-orange: #ff7a1a;
+  --color-orange-soft: #ff9f3d;
+  --color-bg: #eef3f9;
+  --color-card: #ffffff;
+  --color-panel: #f4f7fb;
+  --color-success: #22c55e;
+  --color-text: #13213c;
+  --color-subtle: #5d728b;
+  --color-border: rgba(15, 23, 42, 0.08);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background:
+    radial-gradient(circle at top, rgba(255, 130, 0, 0.16), transparent 30%),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button, input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.shopradar-page-shell {
+  background: var(--color-bg);
+}
+
+.shopradar-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  border-radius: 28px;
+  overflow: hidden;
+  background: #f7f9fc;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 24px 60px rgba(9, 28, 59, 0.08);
+}
+
+.shopradar-header {
+  background: linear-gradient(135deg, var(--color-navy), var(--color-deep-navy));
+  color: #fff;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.shopradar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.shopradar-brand strong {
+  color: #fff;
+}
+
+.shopradar-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--color-orange);
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.shopradar-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.shopradar-nav-link {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.92rem;
+  transition: opacity 0.2s ease;
+}
+
+.shopradar-nav-link:hover {
+  opacity: 1;
+}
+
+.shopradar-primary-button,
+.shopradar-cta-button,
+.shopradar-highlight-copy button,
+.shopradar-section-title-row button,
+.shopradar-panel-header button {
+  background: linear-gradient(135deg, var(--color-orange), var(--color-orange-soft));
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.8rem 1.2rem;
+  font-weight: 700;
+  box-shadow: 0 10px 18px rgba(255, 122, 26, 0.2);
+}
+
+.shopradar-content {
+  padding: 1.75rem;
+}
+
+.shopradar-hero-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.shopradar-kicker {
+  color: var(--color-orange);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.shopradar-page-title {
+  margin: 0.35rem 0 0;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+  color: var(--color-text);
+}
+
+.shopradar-page-subtitle {
+  margin: 0.5rem 0 0;
+  color: var(--color-subtle);
+  font-size: 1rem;
+}
+
+.shopradar-page-action {
+  margin-left: auto;
+}
+
+.shopradar-home-layout {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.shopradar-hero-panel {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 1rem;
+  background: linear-gradient(135deg, rgba(8, 31, 71, 0.96), rgba(15, 41, 79, 0.9));
+  border-radius: 28px;
+  padding: 1.25rem;
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.shopradar-hero-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  color: #fff;
+  padding: 0.5rem;
+}
+
+.shopradar-search-bar {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: rgba(255,255,255,0.75);
+  backdrop-filter: blur(8px);
+}
+
+.shopradar-search-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.shopradar-search-meta button {
+  border: none;
+  border-radius: 12px;
+  padding: 0.72rem 1rem;
+  background: var(--color-orange);
+  color: white;
+  font-weight: 700;
+}
+
+.shopradar-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
+.shopradar-pill-row span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255,255,255,0.88);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.82rem;
+}
+
+.shopradar-hero-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.shopradar-hero-visual::before {
+  content: '';
+  position: absolute;
+  inset: 10% 5% 8% 20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 122, 26, 0.45), rgba(255, 122, 26, 0));
+}
+
+.phone-card {
+  position: relative;
+  width: 260px;
+  height: 360px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #ffffff, #eef3fb);
+  padding: 0.9rem 0.8rem 1rem;
+  box-shadow: 0 28px 38px rgba(3, 12, 29, 0.35);
+  z-index: 1;
+}
+
+.phone-header {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.2rem 0 0.8rem;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot.red { background: #ff7a7a; }
+.dot.amber { background: #f7c96b; }
+.dot.green { background: #5ad07b; }
+
+.phone-body {
+  height: calc(100% - 32px);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #f5f9ff, #ecf2fb);
+  position: relative;
+  overflow: hidden;
+}
+
+.mini-product {
+  position: absolute;
+  right: 18%;
+  bottom: 16%;
+  width: 130px;
+  height: 130px;
+  border-radius: 32px;
+  background: linear-gradient(145deg, #ff986e, #ff7a1a 40%, #ff6000);
+  box-shadow: inset -20px -18px 30px rgba(160, 51, 0, 0.2);
+  transform: rotate(12deg);
+}
+
+.shopradar-product-section,
+.shopradar-highlight-panel,
+.shopradar-panel {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--color-border);
+  border-radius: 22px;
+  padding: 1rem;
+}
+
+.shopradar-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.shopradar-section-title-row h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: -0.04em;
+}
+
+.shopradar-section-title-row button {
+  padding: 0.7rem 1rem;
+}
+
+.shopradar-product-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.shopradar-product-card {
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.shopradar-product-art {
+  height: 150px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shoe-illustration {
+  width: 120px;
+  height: 70px;
+  border-radius: 18px 28px 18px 18px;
+  background: linear-gradient(135deg, #f5f5f8, #dfe7ee 35%, #cad5e2);
+  position: relative;
+  transform: rotate(-18deg);
+  box-shadow: inset -10px -8px 18px rgba(74, 90, 104, 0.16);
+}
+
+.shoe-illustration::before,
+.shoe-illustration::after {
+  content: '';
+  position: absolute;
+  background: rgba(17, 24, 39, 0.14);
+  border-radius: 12px;
+}
+
+.shoe-illustration::before {
+  width: 80%;
+  height: 10px;
+  left: 10%;
+  bottom: -8px;
+}
+
+.shoe-illustration::after {
+  width: 18px;
+  height: 18px;
+  left: 12px;
+  top: 18px;
+  border-radius: 50%;
+}
+
+.shopradar-product-info {
+  padding: 0.8rem 0.85rem 1rem;
+}
+
+.shopradar-product-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.shopradar-product-head button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: white;
+  color: var(--color-subtle);
+}
+
+.shopradar-product-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.shopradar-product-meta strong {
+  font-size: 1rem;
+}
+
+.shopradar-product-meta span {
+  display: inline-flex;
+  border-radius: 999px;
+  background: rgba(255, 122, 26, 0.1);
+  color: var(--color-orange);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.shopradar-highlight-panel {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr;
+  gap: 1rem;
+  background: linear-gradient(135deg, #102a43, #0b1f3d);
+  color: #fff;
+  padding: 1.15rem;
+}
+
+.shopradar-highlight-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.shopradar-highlight-copy h3 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.7rem);
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+
+.shopradar-map-card {
+  min-height: 220px;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #f5f8fd, #dfeaf7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.map-grid {
+  width: 90%;
+  height: 160px;
+  border-radius: 18px;
+  background:
+    linear-gradient(rgba(25, 47, 84, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(25, 47, 84, 0.08) 1px, transparent 1px),
+    linear-gradient(135deg, #edf3fb, #dfeaf7);
+  background-size: 22px 22px, 22px 22px, 100% 100%;
+  position: relative;
+}
+
+.pin {
+  position: absolute;
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-orange);
+  border: 5px solid rgba(255,255,255,0.9);
+  box-shadow: 0 10px 25px rgba(255, 122, 26, 0.4);
+}
+
+.pin-one { left: 28%; top: 48%; }
+.pin-two { left: 56%; top: 30%; }
+.pin-three { left: 72%; top: 65%; }
+
+.shopradar-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 0.9fr;
+  gap: 1rem;
+}
+
+.shopradar-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.shopradar-panel-label {
+  display: inline-block;
+  color: var(--color-orange);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+}
+
+.shopradar-panel-header h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.04em;
+}
+
+.shopradar-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(100px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.shopradar-stat-row div {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 0.8rem;
+}
+
+.shopradar-stat-row span {
+  display: block;
+  color: var(--color-subtle);
+  font-size: 0.8rem;
+}
+
+.shopradar-stat-row strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.2rem;
+}
+
+.chart-bars {
+  height: 160px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem 0.3rem 0.2rem;
+}
+
+.chart-bars span {
+  display: block;
+  flex: 1;
+  background: linear-gradient(180deg, #ffae6a, #ff7a1a);
+  border-radius: 12px 12px 0 0;
+  min-height: 18%;
+}
+
+.shopradar-payment-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.shopradar-payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #f9fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 0.75rem 0.9rem;
+}
+
+.shopradar-payment-row strong,
+.shopradar-payment-row span {
+  display: block;
+}
+
+.shopradar-payment-row span {
+  color: var(--color-subtle);
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  padding: 0.38rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.status-badge.green {
+  background: rgba(34, 197, 94, 0.12);
+  color: #1a8b41;
+}
+
+.status-badge.amber {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b36a00;
+}
+
+.status-badge.blue {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+@media (max-width: 980px) {
+  .shopradar-header {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .shopradar-nav {
+    justify-content: center;
+  }
+
+  .shopradar-hero-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .shopradar-hero-panel,
+  .shopradar-highlight-panel,
+  .shopradar-dashboard-grid,
+  .shopradar-product-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .shopradar-content {
+    padding: 1rem;
+  }
+
+  .shopradar-page-title {
+    font-size: 2.2rem;
+  }
+
+  .shopradar-hero-panel {
+    min-height: auto;
+  }
+
+  .phone-card {
+    width: 220px;
+    height: 300px;
+  }
+}

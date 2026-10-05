@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@shopradar/auth",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "dependencies": {
+    "bcryptjs": "^3.0.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.5"
+  }
+}

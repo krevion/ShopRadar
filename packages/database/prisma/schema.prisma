@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  role         Role           @default(CUSTOMER)
+  active       Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sellerProfile SellerProfile?
+  orders       Order[]
+  payments     Payment[]
+  videoLikes   VideoLike[]
+  videoComments VideoComment[]
+  sellerFavorites SellerFavorite[]
+  sellerMessages SellerMessage[]
+}
+
+model SellerProfile {
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName    String
+  bio         String?
+  status      SellerStatus @default(PENDING)
+  isVerified  Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  shop        Shop?
+  videos      Video[]
+  favorites   SellerFavorite[]
+  messages    SellerMessage[]
+}
+
+model Shop {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  address     String?
+  city        String?
+  sellerId    String    @unique
+  seller      SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String   @unique
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  category    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    OrderStatus @default(PENDING)
+  total     Decimal     @db.Decimal(10, 2)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  items     OrderItem[]
+  payments  Payment[]
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@unique([orderId, productId])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId           String?
+  order             Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  provider          String
+  amount            Decimal       @db.Decimal(10, 2)
+  status            PaymentStatus @default(PENDING)
+  reference         String        @unique
+  providerReference String?       @unique
+  callbackToken     String?       @unique
+  receipt           String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Video {
+  id              String        @id @default(cuid())
+  sellerProfileId String
+  sellerProfile   SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  title           String
+  category        String
+  duration        String
+  durationSeconds Int
+  description     String
+  videoUrl        String
+  views           Int           @default(0)
+  likes           Int           @default(0)
+  comments        Int           @default(0)
+  createdAt       DateTime      @default(now())
+  likeRecords     VideoLike[]
+  commentRecords  VideoComment[]
+
+  @@index([sellerProfileId, createdAt])
+}
+
+model VideoLike {
+  id        String   @id @default(cuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, userId])
+}
+
+model VideoComment {
+  id        String   @id @default(cuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([videoId, createdAt])
+}
+
+model SellerFavorite {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sellerProfileId String
+  sellerProfile   SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([userId, sellerProfileId])
+}
+
+model SellerMessage {
+  id              String        @id @default(cuid())
+  senderId        String
+  sender          User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  sellerProfileId String
+  sellerProfile   SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  body            String
+  createdAt       DateTime      @default(now())
+
+  @@index([sellerProfileId, createdAt])
+}

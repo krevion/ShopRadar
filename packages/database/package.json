@@ -1,0 +1,14 @@
+{
+  "name": "@shopradar/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0"
+  }
+}
