@@ -4,7 +4,6 @@ import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { HealthController } from './health/health.controller';
 import { MapsModule } from './maps/maps.module';
-import { MpesaService } from './payments/mpesa.service';
 import { PaymentsModule } from './payments/payments.module';
 import { ProductsModule } from './products/products.module';
 import { ReportsModule } from './reports/reports.module';
@@ -15,9 +14,11 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
 import { VideosModule } from './videos/videos.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DatabaseModule } from './common/database.module';
 
 @Module({
   imports: [
+    DatabaseModule,
     ProductsModule,
     ShopsModule,
     SellersModule,
@@ -33,8 +34,6 @@ import { NotificationsModule } from './notifications/notifications.module';
     MapsModule,
     PaymentsModule
   ],
-  controllers: [HealthController],
-  providers: [MpesaService],
-  exports: [MpesaService]
+  controllers: [HealthController]
 })
 export class AppModule {}

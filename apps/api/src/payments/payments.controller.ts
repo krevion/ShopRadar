@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Get, Param, Post, Req, UseGuards
 import { IsNotEmpty, IsString, Matches } from 'class-validator';
 import type { Request } from 'express';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { apiConfig } from '../config/env';
 import { PaymentsService } from './payments.service';
 
 class InitiateSubscriptionPaymentDto {
@@ -15,10 +16,9 @@ class InitiateSubscriptionPaymentDto {
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @Post('initiate')
-  @UseGuards(JwtAuthGuard)
-  initiate(@Body() body: { phoneNumber: string; amount: number; accountReference?: string }) {
-    return this.paymentsService.initiatePayment(body);
+  @Get('status')
+  getStatus() {
+    return { enabled: apiConfig.paymentsEnabled };
   }
 
   @Post('subscription')

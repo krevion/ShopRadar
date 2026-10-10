@@ -1,7 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
 
 @Controller()
 export class HealthController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Get('health')
   getHealth() {
     return {
@@ -12,10 +15,19 @@ export class HealthController {
   }
 
   @Get('ready')
-  getReady() {
+  async getReady() {
+    if (!(await this.prisma.isReady())) {
+      throw new ServiceUnavailableException({
+        status: 'not_ready',
+        service: 'shopradar-api',
+        database: 'unavailable'
+      });
+    }
+
     return {
       status: 'ready',
       service: 'shopradar-api',
+      database: 'available',
       timestamp: new Date().toISOString()
     };
   }

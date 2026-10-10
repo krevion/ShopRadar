@@ -19,9 +19,28 @@ export default function SellerCheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState('');
   const [hasToken, setHasToken] = useState(false);
+  const [paymentsEnabled, setPaymentsEnabled] = useState<boolean | null>(null);
+  const [paymentStatusError, setPaymentStatusError] = useState(false);
 
   useEffect(() => {
     setHasToken(Boolean(localStorage.getItem('shopradar-access-token')));
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${API_URL}/api/payments/status`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Payment availability could not be checked.');
+        return response.json() as Promise<{ enabled: boolean }>;
+      })
+      .then((result) => setPaymentsEnabled(result.enabled))
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPaymentsEnabled(false);
+          setPaymentStatusError(true);
+        }
+      });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -44,7 +63,7 @@ export default function SellerCheckoutPage() {
         if (cancelled) return;
         setPaymentStatus(payment.status);
         if (payment.status === 'SUCCESSFUL') {
-          setStatus('Payment confirmed. Your seller video subscription is active for 30 days.');
+          setStatus('Payment confirmed. Your full ShopRadar seller subscription is active for 30 days.');
         } else if (payment.status === 'FAILED') {
           setStatus('Payment was not completed. Please start another payment request.');
         } else {
@@ -103,40 +122,47 @@ export default function SellerCheckoutPage() {
   return (
     <SiteShell
       title="Seller subscription"
-      subtitle="Complete a verified M-Pesa payment to activate your seller subscription."
+      subtitle="Your first month is free. After the trial, a verified KSh 1,000 M-Pesa payment continues the full ShopRadar seller experience for 30 days."
       action={<a href="/seller/register" style={{ color: '#9a4d00', fontWeight: 800 }}>Seller sign in</a>}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(260px, 0.85fr)', gap: '1.25rem', alignItems: 'start' }}>
         <section style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 18, padding: '1.25rem', display: 'grid', gap: '1rem' }}>
           <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>M-Pesa payment</div>
           {!hasToken ? <p style={{ margin: 0, color: '#9a4d00' }}>Sign in with your seller account before starting checkout.</p> : null}
-          <label style={labelStyle}>
-            M-Pesa phone number
-            <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="0712345678" autoComplete="tel" style={inputStyle} />
-          </label>
-          <button
-            type="button"
-            onClick={() => void startPayment()}
-            disabled={!hasToken || isSubmitting || paymentStatus === 'PENDING'}
-            style={{ border: 0, borderRadius: 12, padding: '0.9rem 1.2rem', background: !hasToken || isSubmitting || paymentStatus === 'PENDING' ? '#94a3b8' : 'var(--color-orange)', color: '#fff', fontWeight: 800 }}
-          >
-            {isSubmitting ? 'Starting payment…' : paymentStatus === 'PENDING' ? 'Waiting for M-Pesa confirmation…' : 'Pay KSh 1,000'}
-          </button>
+          {paymentsEnabled === true ? <>
+            <label style={labelStyle}>
+              M-Pesa phone number
+              <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="0712345678" autoComplete="tel" style={inputStyle} />
+            </label>
+            <button
+              type="button"
+              onClick={() => void startPayment()}
+              disabled={!hasToken || isSubmitting || paymentStatus === 'PENDING'}
+              style={{ border: 0, borderRadius: 12, padding: '0.9rem 1.2rem', background: !hasToken || isSubmitting || paymentStatus === 'PENDING' ? '#94a3b8' : 'var(--color-orange)', color: '#fff', fontWeight: 800 }}
+            >
+              {isSubmitting ? 'Starting payment?' : paymentStatus === 'PENDING' ? 'Waiting for M-Pesa confirmation?' : 'Pay KSh 1,000'}
+            </button>
+          </> : paymentsEnabled === false ? <div role="status" style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: '0.9rem 1rem', color: '#9a4d00', lineHeight: 1.55 }}>
+            {paymentStatusError
+              ? 'Payment availability could not be verified. Checkout is unavailable right now; your seller account and business profile remain saved.'
+              : 'M-Pesa checkout is paused while ShopRadar waits for Safaricom setup. Your one-month free trial is available now; paid renewals will be available after checkout is configured.'}
+          </div> : <p>Checking payment availability…</p>}
           {status ? <div role="status" style={{ background: paymentStatus === 'FAILED' ? '#fef2f2' : '#f8fafc', borderRadius: 12, padding: '0.9rem 1rem', color: paymentStatus === 'FAILED' ? '#b91c1c' : '#334155', lineHeight: 1.55 }}>{status}</div> : null}
-          {paymentStatus === 'SUCCESSFUL' ? <a href="/seller/videos" style={{ color: '#166534', fontWeight: 800 }}>Open seller video studio →</a> : null}
+          {paymentStatus === 'SUCCESSFUL' ? <a href="/seller" style={{ color: '#166534', fontWeight: 800 }}>Open your seller hub →</a> : null}
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem', lineHeight: 1.55 }}>
-            ShopRadar never accepts a browser-side “payment complete” flag. Upload eligibility is granted only after the server receives a successful payment confirmation.
+            ShopRadar never accepts a browser-side “payment complete” flag. Seller subscription activation follows verified payment confirmation from the provider.
           </p>
         </section>
 
         <aside style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 18, padding: '1.25rem', display: 'grid', gap: '1rem' }}>
-          <strong style={{ fontSize: '1.1rem' }}>Seller video access</strong>
+          <strong style={{ fontSize: '1.1rem' }}>Your full seller toolkit</strong>
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: '1rem', display: 'grid', gap: '0.8rem' }}>
-            <div><strong>Subscription</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>KSh 1,000 per month</div></div>
-            <div><strong>Seller profile</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Must be registered to this account</div></div>
-            <div><strong>Video length</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Maximum 2 minutes 30 seconds</div></div>
+            <div><strong>Free trial</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>First 30 days are free for new seller profiles</div></div>
+            <div><strong>After the trial</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>KSh 1,000 for each additional 30 days, paid through M-Pesa</div></div>
+            <div><strong>Business tools</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Complete registration and manage your shop and products</div></div>
+            <div><strong>Shopper reach</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Engage shoppers and promote with videos up to 2 minutes 30 seconds</div></div>
           </div>
-          <p style={{ margin: 0, color: '#64748b', lineHeight: 1.55 }}>A successful subscription payment is valid for video uploads for 30 days.</p>
+          <p style={{ margin: 0, color: '#64748b', lineHeight: 1.55 }}>The subscription is for the complete seller experience. Your shop must still pass seller approval before it appears publicly.</p>
         </aside>
       </div>
     </SiteShell>

@@ -1,5 +1,6 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, Module, NotFoundException, Post, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { Body, ConflictException, Controller, ForbiddenException, Get, Module, NotFoundException, Patch, Post, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import { IsNumber, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PrismaService } from '../common/prisma.service';
@@ -13,6 +14,68 @@ class RegisterSellerProfileDto {
   @IsString()
   @MaxLength(500)
   bio = '';
+
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude!: number;
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  locationLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  buildingName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  roomNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  street?: string;
+}
+
+class UpdateSellerLocationDto {
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude!: number;
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  locationLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  buildingName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  roomNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  street?: string;
 }
 
 class CreateSellerMessageDto {
@@ -22,69 +85,65 @@ class CreateSellerMessageDto {
   body!: string;
 }
 
-const defaultSellers = [
-  {
-    id: 'seller-1',
-    name: 'Patricia Wanjiku',
-    business: 'Fresh Harvest',
-    verified: true,
-    sales: 176,
-    status: 'APPROVED',
-    subscription: 'KSh 1,000/month',
-    email: 'patricia@freshharvest.co.ke'
-  },
-  {
-    id: 'seller-2',
-    name: 'Owen Kariuki',
-    business: 'Smart Home Kenya',
-    verified: true,
-    sales: 293,
-    status: 'APPROVED',
-    subscription: 'KSh 1,000/month',
-    email: 'owen@smarthome.co.ke'
-  },
-  {
-    id: 'seller-3',
-    name: 'Miriam Achieng',
-    business: 'Mia Essentials',
-    verified: false,
-    sales: 91,
-    status: 'PENDING',
-    subscription: 'Free first month',
-    email: 'miriam@miaessentials.co.ke'
-  }
-];
-
 class SellersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
-    try {
-      const sellers = await this.prisma.sellerProfile.findMany({
-        include: {
-          user: { select: { email: true } },
-          shop: true
-        },
-        orderBy: { createdAt: 'desc' }
-      });
+    this.requireDatabase('Seller directory is unavailable while the database is offline.');
+    const sellers = await this.prisma.sellerProfile.findMany({
+      where: { status: 'APPROVED', isVerified: true },
+      include: { shop: true },
+      orderBy: { createdAt: 'desc' },
+      take: 200
+    });
 
-      if (sellers.length > 0) {
-        return sellers.map((seller) => ({
-          id: seller.id,
-          name: seller.user.email.split('@')[0] || seller.shopName,
-          business: seller.shop?.name ?? seller.shopName,
-          verified: seller.isVerified,
-          sales: 0,
-          status: seller.status,
-          subscription: 'KSh 1,000/month',
-          email: seller.user.email
-        }));
-      }
+    return sellers.map((seller) => ({
+      id: seller.id,
+      name: seller.shop?.name ?? seller.shopName,
+      business: seller.shop?.name ?? seller.shopName,
+      locationLabel: seller.locationLabel,
+      buildingName: seller.buildingName,
+      roomNumber: seller.roomNumber,
+      street: seller.street,
+      latitude: seller.latitude,
+      longitude: seller.longitude,
+      verified: seller.isVerified,
+      status: seller.status
+    }));
+  }
 
-      return defaultSellers;
-    } catch {
-      return defaultSellers;
-    }
+  async findOne(id: string) {
+    this.requireDatabase('Seller profiles are unavailable while the database is offline.');
+    const seller = await this.prisma.sellerProfile.findFirst({
+      where: { id, status: 'APPROVED', isVerified: true },
+      include: { shop: true }
+    });
+    if (!seller) throw new NotFoundException('Seller was not found.');
+    return {
+      id: seller.id,
+      name: seller.shop?.name ?? seller.shopName,
+      shopName: seller.shop?.name ?? seller.shopName,
+      bio: seller.bio,
+      locationLabel: seller.locationLabel,
+      buildingName: seller.buildingName,
+      roomNumber: seller.roomNumber,
+      street: seller.street,
+      latitude: seller.latitude,
+      longitude: seller.longitude,
+      verified: seller.isVerified,
+      status: seller.status
+    };
+  }
+
+  async findCurrent(user: AuthenticatedUser) {
+    if (user.role !== 'SELLER') throw new ForbiddenException('A seller account is required.');
+    await this.requireActiveUser(user);
+    const seller = await this.prisma.sellerProfile.findUnique({
+      where: { userId: user.sub },
+      select: { shopName: true, bio: true, locationLabel: true, buildingName: true, roomNumber: true, street: true, latitude: true, longitude: true }
+    });
+    if (!seller) throw new NotFoundException('Register your seller profile before adding a shop location.');
+    return seller;
   }
 
   async register(user: AuthenticatedUser, dto: RegisterSellerProfileDto) {
@@ -98,22 +157,70 @@ class SellersService {
       throw new ConflictException('A seller profile is already registered for this account.');
     }
 
+    const shopName = dto.shopName.trim();
+    const bio = dto.bio.trim();
+    const locationLabel = dto.locationLabel?.trim() || null;
+    const buildingName = dto.buildingName?.trim() || null;
+    const roomNumber = dto.roomNumber?.trim() || null;
+    const street = dto.street?.trim() || null;
     const profile = await this.prisma.sellerProfile.create({
       data: {
         userId: user.sub,
-        shopName: dto.shopName.trim(),
-        bio: dto.bio.trim() || null,
+        shopName,
+        bio: bio || null,
+        locationLabel,
+        buildingName,
+        roomNumber,
+        street,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
         status: 'PENDING',
-        isVerified: false
-      }
+        isVerified: false,
+        shop: {
+          create: {
+            name: shopName,
+            slug: `${slugify(shopName).slice(0, 80) || 'shop'}-${randomUUID().slice(0, 8)}`,
+            description: bio || null,
+            address: formatShopAddress({ buildingName, roomNumber, street, locationLabel })
+          }
+        }
+      },
+      include: { shop: { select: { id: true, slug: true } } }
     });
 
     return {
       id: profile.id,
       shopName: profile.shopName,
+      shopId: profile.shop?.id ?? null,
       status: profile.status,
       isVerified: profile.isVerified
     };
+  }
+
+  async updateLocation(user: AuthenticatedUser, dto: UpdateSellerLocationDto) {
+    if (user.role !== 'SELLER') throw new ForbiddenException('A seller account is required.');
+    await this.requireActiveUser(user);
+    const profile = await this.prisma.sellerProfile.findUnique({
+      where: { userId: user.sub },
+      select: { id: true, buildingName: true, roomNumber: true, street: true }
+    });
+    if (!profile) throw new NotFoundException('Register your seller profile before adding a shop location.');
+    const locationLabel = dto.locationLabel?.trim() || null;
+    const buildingName = dto.buildingName === undefined ? profile.buildingName : dto.buildingName?.trim() || null;
+    const roomNumber = dto.roomNumber === undefined ? profile.roomNumber : dto.roomNumber?.trim() || null;
+    const street = dto.street === undefined ? profile.street : dto.street?.trim() || null;
+    return this.prisma.$transaction(async (transaction) => {
+      const updated = await transaction.sellerProfile.update({
+        where: { id: profile.id },
+        data: { latitude: dto.latitude, longitude: dto.longitude, locationLabel, buildingName, roomNumber, street },
+        select: { latitude: true, longitude: true, locationLabel: true, buildingName: true, roomNumber: true, street: true }
+      });
+      await transaction.shop.updateMany({
+        where: { sellerId: profile.id },
+        data: { address: formatShopAddress({ buildingName, roomNumber, street, locationLabel }) }
+      });
+      return updated;
+    });
   }
 
   async analytics(user: AuthenticatedUser) {
@@ -203,8 +310,20 @@ class SellersService {
     });
     if (!seller) throw new NotFoundException('Seller was not found.');
     if (seller.userId === user.sub) throw new ForbiddenException('You cannot message your own seller profile.');
-    const message = await this.prisma.sellerMessage.create({
-      data: { senderId: user.sub, sellerProfileId, body: body.trim() }
+    const sender = await this.prisma.user.findUnique({ where: { id: user.sub }, select: { email: true } });
+    const message = await this.prisma.$transaction(async (transaction) => {
+      const createdMessage = await transaction.sellerMessage.create({
+        data: { senderId: user.sub, sellerProfileId, body: body.trim() }
+      });
+      await transaction.notification.create({
+        data: {
+          userId: seller.userId,
+          type: 'SELLER_MESSAGE',
+          title: 'New shop message',
+          body: `${sender?.email.split('@')[0] ?? 'A shopper'} sent you a message.`
+        }
+      });
+      return createdMessage;
     });
     return { id: message.id, body: message.body, createdAt: message.createdAt };
   }
@@ -246,6 +365,24 @@ class SellersService {
   }
 }
 
+function slugify(value: string) {
+  return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function formatShopAddress(location: {
+  buildingName?: string | null;
+  roomNumber?: string | null;
+  street?: string | null;
+  locationLabel?: string | null;
+}) {
+  return [
+    location.buildingName,
+    location.roomNumber ? `Room ${location.roomNumber}` : null,
+    location.street,
+    location.locationLabel
+  ].map((part) => part?.trim()).filter(Boolean).join(', ') || null;
+}
+
 @Controller('sellers')
 class SellersController {
   constructor(private readonly sellersService: SellersService) {}
@@ -267,6 +404,18 @@ class SellersController {
     return this.sellersService.register(request.user, dto);
   }
 
+  @Patch('location')
+  @UseGuards(JwtAuthGuard)
+  updateLocation(@Req() request: Request & { user: AuthenticatedUser }, @Body() dto: UpdateSellerLocationDto) {
+    return this.sellersService.updateLocation(request.user, dto);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  findCurrent(@Req() request: Request & { user: AuthenticatedUser }) {
+    return this.sellersService.findCurrent(request.user);
+  }
+
   @Post(':id/favorite')
   @UseGuards(JwtAuthGuard)
   favorite(@Req() request: Request & { user: AuthenticatedUser; params: { id: string } }) {
@@ -277,6 +426,11 @@ class SellersController {
   @UseGuards(JwtAuthGuard)
   favorites(@Req() request: Request & { user: AuthenticatedUser }) {
     return this.sellersService.findFavorites(request.user);
+  }
+
+  @Get(':id')
+  findOne(@Req() request: Request & { params: { id: string } }) {
+    return this.sellersService.findOne(request.params.id);
   }
 
   @Post(':id/messages')
@@ -297,6 +451,6 @@ class SellersController {
 
 @Module({
   controllers: [SellersController],
-  providers: [SellersService, PrismaService]
+  providers: [SellersService]
 })
 export class SellersModule {}

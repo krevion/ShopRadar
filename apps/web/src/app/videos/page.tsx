@@ -19,24 +19,9 @@ type VideoItem = {
   sellerBio?: string | null;
   sellerCity?: string | null;
   sellerVerified?: boolean;
-  preview?: boolean;
 };
 
 type Tab = 'discover' | 'reels' | 'upload';
-
-const previewVideo: VideoItem = {
-  id: 'shopradar-preview',
-  title: 'A quick look at Reels',
-  seller: 'ShopRadar preview',
-  category: 'Preview',
-  duration: '12s',
-  description: 'A short sample clip. Seller videos appear here once they are published.',
-  videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-  views: 128,
-  likes: 14,
-  comments: 3,
-  preview: true
-};
 
 const shuffle = <T,>(items: T[]): T[] => {
   const shuffled = [...items];
@@ -65,6 +50,10 @@ export default function VideosPage() {
   const [messages, setMessages] = useState<Record<string, string[]>>({});
   const [status, setStatus] = useState('');
   const [focusVideoId, setFocusVideoId] = useState<string | null>(null);
+  const [activeReelId, setActiveReelId] = useState<string | null>(null);
+  const [reelPlaying, setReelPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const reelsFeedRef = useRef<HTMLDivElement>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const recordedViews = useRef<Set<string>>(new Set());
   const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -88,39 +77,25 @@ export default function VideosPage() {
   }, []);
 
   useEffect(() => {
-    try {
-      const storedLikes = JSON.parse(localStorage.getItem('shopradar-video-likes') ?? '[]') as string[];
-      const storedFavorites = JSON.parse(localStorage.getItem('shopradar-seller-favorites') ?? '[]') as string[];
-      const storedComments = JSON.parse(localStorage.getItem('shopradar-video-comments') ?? '{}') as Record<string, string[]>;
-      const storedMessages = JSON.parse(localStorage.getItem('shopradar-seller-messages') ?? '{}') as Record<string, string[]>;
-      setLiked(new Set(storedLikes));
-      setFavorites(new Set(storedFavorites));
-      setComments(storedComments);
-      setMessages(storedMessages);
-    } catch {
-      setStatus('Saved actions could not be restored from this browser.');
-    }
-
     const token = localStorage.getItem('shopradar-access-token');
-    if (token) {
-      Promise.all([
-        fetch(`${api}/api/videos/likes`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${api}/api/sellers/favorites`, { headers: { Authorization: `Bearer ${token}` } })
-      ])
-        .then(async ([likesResponse, favoritesResponse]) => {
-          if (!likesResponse.ok || !favoritesResponse.ok) throw new Error('Your saved video actions could not be loaded.');
-          const [videoIds, sellerNames] = await Promise.all([
-            likesResponse.json() as Promise<string[]>,
-            favoritesResponse.json() as Promise<string[]>
-          ]);
-          setLiked(new Set(videoIds));
-          setFavorites(new Set(sellerNames));
-        })
-        .catch((error: unknown) => setStatus(error instanceof Error ? error.message : 'Your saved video actions could not be loaded.'));
-    }
+    if (!token) return;
+    Promise.all([
+      fetch(`${api}/api/videos/likes`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${api}/api/sellers/favorites`, { headers: { Authorization: `Bearer ${token}` } })
+    ])
+      .then(async ([likesResponse, favoritesResponse]) => {
+        if (!likesResponse.ok || !favoritesResponse.ok) throw new Error('Your saved video actions could not be loaded.');
+        const [videoIds, sellerNames] = await Promise.all([
+          likesResponse.json() as Promise<string[]>,
+          favoritesResponse.json() as Promise<string[]>
+        ]);
+        setLiked(new Set(videoIds));
+        setFavorites(new Set(sellerNames));
+      })
+      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : 'Your saved video actions could not be loaded.'));
   }, []);
 
-  const visibleVideos = videos.length > 0 ? videos : [previewVideo];
+  const visibleVideos = videos;
   const filteredVideos = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
     if (!term) {
@@ -139,84 +114,87 @@ export default function VideosPage() {
     setFocusVideoId(null);
   }, [focusVideoId, tab]);
 
-  const persist = (key: string, value: unknown) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      setStatus('Your browser could not save this action.');
-    }
-  };
+  useEffect(() => {
+    if (tab !== 'reels') return;
+    const feed = reelsFeedRef.current;
+    if (!feed) return;
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const row = entry.target as HTMLElement;
+        const video = row.querySelector('video');
+        if (!video) return;
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.7) {
+          const videoId = row.dataset.reelId;
+          if (videoId) setActiveReelId(videoId);
+          video.muted = muted;
+          void video.play().then(() => setReelPlaying(true)).catch(() => setReelPlaying(false));
+        } else {
+          video.pause();
+        }
+      });
+    }, { root: feed, threshold: [0, 0.7, 1] });
+    const rows = feed.querySelectorAll<HTMLElement>('.reel-row');
+    rows.forEach((row) => observer.observe(row));
+    return () => {
+      observer.disconnect();
+      rows.forEach((row) => row.querySelector('video')?.pause());
+      setReelPlaying(false);
+    };
+  }, [tab, visibleVideos.length, muted]);
 
   const toggleLike = async (video: VideoItem) => {
-    if (!video.preview) {
-      const token = localStorage.getItem('shopradar-access-token');
-      if (!token) {
-        setStatus('Sign in to like videos.');
-        window.location.href = '/account';
-        return;
-      }
-      try {
-        const response = await fetch(`${api}/api/videos/${encodeURIComponent(video.id)}/like`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error(`Like could not be saved (${response.status}).`);
-        const result = await response.json() as { liked: boolean; likes: number };
-        setLiked((current) => {
-          const next = new Set(current);
-          if (result.liked) next.add(video.id);
-          else next.delete(video.id);
-          return next;
-        });
-        setLikeCounts((current) => ({ ...current, [video.id]: result.likes }));
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'Like could not be saved.');
-      }
+    const token = localStorage.getItem('shopradar-access-token');
+    if (!token) {
+      setStatus('Sign in to like videos.');
+      window.location.href = '/account';
       return;
     }
-    const next = new Set(liked);
-    if (next.has(video.id)) next.delete(video.id);
-    else next.add(video.id);
-    setLiked(next);
-    setLikeCounts((current) => ({
-      ...current,
-      [video.id]: video.likes + (next.has(video.id) ? 1 : 0)
-    }));
-    persist('shopradar-video-likes', [...next]);
+    try {
+      const response = await fetch(`${api}/api/videos/${encodeURIComponent(video.id)}/like`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error(`Like could not be saved (${response.status}).`);
+      const result = await response.json() as { liked: boolean; likes: number };
+      setLiked((current) => {
+        const next = new Set(current);
+        if (result.liked) next.add(video.id);
+        else next.delete(video.id);
+        return next;
+      });
+      setLikeCounts((current) => ({ ...current, [video.id]: result.likes }));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Like could not be saved.');
+    }
   };
 
   const toggleFavorite = async (video: VideoItem) => {
-    const seller = video.seller;
-    if (!video.preview && video.sellerProfileId) {
-      const token = localStorage.getItem('shopradar-access-token');
-      if (!token) {
-        setStatus('Sign in to favourite sellers.');
-        window.location.href = '/account';
-        return;
-      }
-      try {
-        const response = await fetch(`${api}/api/sellers/${encodeURIComponent(video.sellerProfileId)}/favorite`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error(`Seller favourite could not be saved (${response.status}).`);
-        const result = await response.json() as { favorited: boolean };
-        setFavorites((current) => {
-          const next = new Set(current);
-          if (result.favorited) next.add(seller);
-          else next.delete(seller);
-          return next;
-        });
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'Seller favourite could not be saved.');
-      }
+    const token = localStorage.getItem('shopradar-access-token');
+    if (!token) {
+      setStatus('Sign in to favourite sellers.');
+      window.location.href = '/account';
       return;
     }
-    const next = new Set(favorites);
-    if (next.has(seller)) next.delete(seller);
-    else next.add(seller);
-    setFavorites(next);
-    persist('shopradar-seller-favorites', [...next]);
+    if (!video.sellerProfileId) {
+      setStatus('This seller profile is unavailable.');
+      return;
+    }
+    try {
+      const response = await fetch(`${api}/api/sellers/${encodeURIComponent(video.sellerProfileId)}/favorite`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error(`Seller favourite could not be saved (${response.status}).`);
+      const result = await response.json() as { favorited: boolean };
+      setFavorites((current) => {
+        const next = new Set(current);
+        if (result.favorited) next.add(video.seller);
+        else next.delete(video.seller);
+        return next;
+      });
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Seller favourite could not be saved.');
+    }
   };
 
   const openComments = async (video: VideoItem) => {
@@ -225,7 +203,6 @@ export default function VideosPage() {
       return;
     }
     setCommentingOn(video.id);
-    if (video.preview) return;
     try {
       const response = await fetch(`${api}/api/videos/${encodeURIComponent(video.id)}/comments`);
       if (!response.ok) throw new Error(`Comments could not be loaded (${response.status}).`);
@@ -241,35 +218,26 @@ export default function VideosPage() {
     event.preventDefault();
     const text = commentText.trim();
     if (!text) return;
-    if (!video.preview) {
-      const token = localStorage.getItem('shopradar-access-token');
-      if (!token) {
-        setStatus('Sign in to comment on videos.');
-        window.location.href = '/account';
-        return;
-      }
-      try {
-        const response = await fetch(`${api}/api/videos/${encodeURIComponent(video.id)}/comments`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ body: text })
-        });
-        if (!response.ok) throw new Error(`Comment could not be posted (${response.status}).`);
-        const created = await response.json() as { author: string; body: string };
-        const next = { ...comments, [video.id]: [...(comments[video.id] ?? []), `${created.author}: ${created.body}`] };
-        setComments(next);
-        setCommentCounts((current) => ({ ...current, [video.id]: (current[video.id] ?? video.comments) + 1 }));
-        setCommentText('');
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'Comment could not be posted.');
-      }
+    const token = localStorage.getItem('shopradar-access-token');
+    if (!token) {
+      setStatus('Sign in to comment on videos.');
+      window.location.href = '/account';
       return;
     }
-    const next = { ...comments, [video.id]: [...(comments[video.id] ?? []), text] };
-    setComments(next);
-    setCommentCounts((current) => ({ ...current, [video.id]: video.comments + next[video.id].length }));
-    persist('shopradar-video-comments', next);
-    setCommentText('');
+    try {
+      const response = await fetch(`${api}/api/videos/${encodeURIComponent(video.id)}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ body: text })
+      });
+      if (!response.ok) throw new Error(`Comment could not be posted (${response.status}).`);
+      const created = await response.json() as { author: string; body: string };
+      setComments((current) => ({ ...current, [video.id]: [...(current[video.id] ?? []), `${created.author}: ${created.body}`] }));
+      setCommentCounts((current) => ({ ...current, [video.id]: (current[video.id] ?? video.comments) + 1 }));
+      setCommentText('');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Comment could not be posted.');
+    }
   };
 
   const downloadVideo = async (video: VideoItem) => {
@@ -308,7 +276,7 @@ export default function VideosPage() {
   };
 
   const recordView = async (video: VideoItem) => {
-    if (video.preview || recordedViews.current.has(video.id)) return;
+    if (recordedViews.current.has(video.id)) return;
     try {
       const response = await fetch(`${api}/api/videos/${encodeURIComponent(video.id)}/view`, { method: 'POST' });
       if (!response.ok) {
@@ -325,7 +293,7 @@ export default function VideosPage() {
     event.preventDefault();
     const text = messageText.trim();
     if (!text) return;
-    if (!video.preview && video.sellerProfileId) {
+    if (video.sellerProfileId) {
       const token = localStorage.getItem('shopradar-access-token');
       if (!token) {
         setStatus('Sign in to message sellers.');
@@ -349,18 +317,14 @@ export default function VideosPage() {
       setStatus('Your message was sent to the seller.');
       return;
     }
-    const seller = video.seller;
-    const next = { ...messages, [seller]: [...(messages[seller] ?? []), text] };
-    setMessages(next);
-    persist('shopradar-seller-messages', next);
-    setMessageText('');
-    setStatus('Sample conversation saved in this browser.');
+    setStatus('This seller profile is unavailable.');
+    return;
   };
 
   const openSellerProfile = async (video: VideoItem) => {
     setProfileVideo(video);
     const token = localStorage.getItem('shopradar-access-token');
-    if (!token || video.preview || !video.sellerProfileId) return;
+    if (!token || !video.sellerProfileId) return;
     try {
       const response = await fetch(`${api}/api/sellers/${encodeURIComponent(video.sellerProfileId)}/messages`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -395,22 +359,45 @@ export default function VideosPage() {
     setTab('reels');
   };
 
+  const toggleReelPlayback = (videoId: string) => {
+    const video = document.getElementById(`reel-${videoId}`)?.querySelector('video');
+    if (!video) return;
+    if (video.paused) {
+      video.muted = muted;
+      void video.play().catch(() => setStatus('This video could not be played.'));
+    } else {
+      video.pause();
+    }
+  };
+
   const renderReel = (video: VideoItem, index: number) => (
     <article
       className="reel-row"
       id={`reel-${video.id}`}
+      data-reel-id={video.id}
       key={video.id}
       onTouchStart={handleTouchStart}
       onTouchEnd={(event) => handleTouchEnd(event, video)}
     >
       <div className="reel-card">
         {video.videoUrl ? (
-          <video className="reel-video" src={video.videoUrl} controls playsInline loop preload={index === 0 ? 'metadata' : 'none'} onPlay={() => void recordView(video)} />
+          <video
+            className="reel-video"
+            src={video.videoUrl}
+            muted={muted}
+            playsInline
+            loop
+            preload={index < 2 ? 'metadata' : 'none'}
+            onClick={() => toggleReelPlayback(video.id)}
+            onPlay={() => { setActiveReelId(video.id); setReelPlaying(true); void recordView(video); }}
+            onPause={() => { if (activeReelId === video.id) setReelPlaying(false); }}
+          />
         ) : (
           <div className="reel-no-video">Video preview unavailable</div>
         )}
         <div className="reel-gradient" />
-        {video.preview ? <span className="reel-preview-badge">Sample preview</span> : null}
+        {video.videoUrl ? <button type="button" className="reel-play-toggle" onClick={() => toggleReelPlayback(video.id)} aria-label={activeReelId === video.id && reelPlaying ? 'Pause video' : 'Play video'}>{activeReelId === video.id && reelPlaying ? 'Ⅱ' : '▶'}</button> : null}
+
         <div className="reel-copy">
           <button type="button" className="reel-seller" onClick={() => void openSellerProfile(video)}>
             <span className="reel-avatar">{video.seller.slice(0, 1).toUpperCase()}</span>
@@ -438,7 +425,11 @@ export default function VideosPage() {
         <button type="button" className="reel-action" onClick={() => void shareVideo(video)} aria-label="Share video">
           <span>↗</span><small>Share</small>
         </button>
+        <button type="button" className="reel-action" onClick={() => setMuted((current) => !current)} aria-label={muted ? 'Turn sound on' : 'Mute video'}>
+          <span>{muted ? '🔇' : '🔊'}</span><small>{muted ? 'Sound off' : 'Sound on'}</small>
+        </button>
       </div>
+
       {commentingOn === video.id ? (
         <aside className="comment-panel">
           <div className="panel-heading"><strong>Comments</strong><button type="button" onClick={() => setCommentingOn(null)} aria-label="Close comments">×</button></div>
@@ -457,15 +448,16 @@ export default function VideosPage() {
 
   return (
     <SiteShell
+      immersive={tab === 'reels'}
       title="ShopRadar videos"
       subtitle="Discover local sellers, watch short clips, and find your next favourite shop."
       action={<a className="video-top-action" href="/seller/videos">＋ Create a video</a>}
     >
-      <div className="video-hub">
+      <div className={`video-hub${tab === 'reels' ? ' reels-mode' : ''}`}>
         <nav className="video-tabs" aria-label="Video sections">
           {([
             ['discover', 'Discover', 'Find videos'],
-            ['reels', 'Reels', 'Scroll to watch'],
+            ['reels', 'Watch Reels', 'Swipe videos'],
             ['upload', 'Upload', 'For sellers']
           ] as const).map(([key, title, hint]) => (
             <button key={key} type="button" className={tab === key ? 'video-tab selected' : 'video-tab'} onClick={() => setTab(key)}>
@@ -473,6 +465,14 @@ export default function VideosPage() {
             </button>
           ))}
         </nav>
+
+        {tab === 'discover' ? (
+          <button type="button" className="reels-feature" onClick={() => setTab('reels')} aria-label="Watch ShopRadar Reels">
+            <span className="reels-feature-icon" aria-hidden="true">▶</span>
+            <span className="reels-feature-copy"><strong>Watch local shops in action</strong><small>Swipe through short videos from ShopRadar sellers.</small></span>
+            <span className="reels-feature-cta">Watch Reels <span aria-hidden="true">→</span></span>
+          </button>
+        ) : null}
 
         {tab === 'discover' ? (
           <section className="discover-section" aria-labelledby="discover-title">
@@ -490,16 +490,20 @@ export default function VideosPage() {
               {search ? <button type="button" onClick={() => setSearch('')}>Clear</button> : null}
             </form>
             {loading ? <p className="video-notice">Loading videos…</p> : null}
-            {apiError ? <p className="video-notice error-notice">{apiError} Showing a sample preview instead.</p> : null}
-            {!loading && filteredVideos.length === 0 ? (
-              <div className="video-empty-state"><strong>No videos match that search.</strong><span>Try another description or browse all reels.</span><button type="button" onClick={() => { setSearch(''); setTab('reels'); }}>Browse Reels</button></div>
+            {apiError ? <p className="video-notice error-notice">{apiError}</p> : null}
+            {!loading && !apiError && filteredVideos.length === 0 ? (
+              <div className="video-empty-state">
+                <strong>{videos.length ? 'No videos match that search.' : 'No seller videos have been published yet.'}</strong>
+                <span>{videos.length ? 'Try another description or browse all reels.' : 'Seller videos will appear here after an approved seller publishes one.'}</span>
+                {videos.length ? <button type="button" onClick={() => { setSearch(''); setTab('reels'); }}>Browse Reels</button> : null}
+              </div>
             ) : (
               <div className="discover-grid">
                 {filteredVideos.map((video) => (
                   <button type="button" className="discover-card" key={video.id} onClick={() => openReel(video.id)}>
                     <div className="discover-media">
                       {video.videoUrl ? <video src={video.videoUrl} muted playsInline preload="metadata" /> : <span>▶</span>}
-                      {video.preview ? <small>PREVIEW</small> : null}
+
                       <span className="discover-play">▶</span>
                     </div>
                     <div className="discover-card-copy">
@@ -512,18 +516,19 @@ export default function VideosPage() {
                 ))}
               </div>
             )}
-            {!videos.length && !loading ? <p className="preview-caption">Sample preview shown while sellers publish their first videos.</p> : null}
           </section>
         ) : null}
 
         {tab === 'reels' ? (
           <section className="reels-section" aria-label="Short video reels">
             <div className="reels-heading">
-              <div><span className="video-kicker">Made by local sellers</span><h2>Reels</h2></div>
-              <span>Scroll up or down to switch videos</span>
+              <button type="button" className="reels-exit" onClick={() => setTab('discover')}>Back to videos</button>
+              <span>Swipe up for the next video</span>
             </div>
-            <div className="reels-feed">
-              {visibleVideos.map((video, index) => renderReel(video, index))}
+            <div className="reels-feed" ref={reelsFeedRef} tabIndex={0} aria-label="Swipe or scroll vertically through videos">
+              {visibleVideos.length
+                ? visibleVideos.map((video, index) => renderReel(video, index))
+                : <div className="video-empty-state"><strong>No seller videos are available yet.</strong><span>Approved sellers will appear here after publishing a video.</span></div>}
             </div>
             <p className="reel-swipe-hint">On touch screens, swipe left on a video to view its seller.</p>
           </section>
@@ -539,7 +544,7 @@ export default function VideosPage() {
               <ul>
                 <li>Registered seller account</li>
                 <li>Registered seller profile</li>
-                <li>Successful KSh 1,000 subscription payment within the last 30 days</li>
+                <li>One-month free trial, then an active ShopRadar seller subscription</li>
               </ul>
               <a className="upload-cta" href="/seller/videos">Continue to seller upload →</a>
               <a className="upload-register-link" href="/seller/register">New to ShopRadar? Register your business</a>
@@ -566,7 +571,7 @@ export default function VideosPage() {
             <div className="profile-cover"><span className="profile-avatar">{profileVideo.seller.slice(0, 1).toUpperCase()}</span></div>
             <span className="video-kicker">Seller profile</span>
             <h2 id="seller-profile-title">{profileVideo.seller}</h2>
-            <p className="profile-status">{profileVideo.sellerVerified ? '✓ Verified ShopRadar seller' : profileVideo.preview ? 'Sample seller profile' : 'ShopRadar seller'}</p>
+            <p className="profile-status">{profileVideo.sellerVerified ? '✓ Verified ShopRadar seller' : 'ShopRadar seller'}</p>
             <div className="profile-details">
               <div><small>Featured in</small><strong>{profileVideo.category}</strong></div>
               <div><small>Shop location</small><strong>{profileVideo.sellerCity || 'Local seller'}</strong></div>
@@ -582,7 +587,7 @@ export default function VideosPage() {
                 <textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} placeholder="Ask about a product or offer…" rows={3} />
                 <button type="submit">Send message</button>
               </form>
-              {profileVideo.preview ? <small>Sample conversations are saved in this browser only.</small> : <small>Your message will appear in the seller&apos;s dashboard inbox.</small>}
+              <small>Your message will appear in the seller&apos;s dashboard inbox.</small>
             </div>
           </aside>
         </div>

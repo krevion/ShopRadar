@@ -1,0 +1,4 @@
+ALTER TABLE "SellerProfile"
+ADD COLUMN "locationLabel" TEXT,
+ADD COLUMN "latitude" DOUBLE PRECISION,
+ADD COLUMN "longitude" DOUBLE PRECISION;

@@ -1,7 +1,18 @@
 'use client';
 
-import { type CSSProperties, useState } from 'react';
+import { type CSSProperties, type FormEvent, useEffect, useState } from 'react';
 import { SiteShell } from '@/components/site-shell';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+type Product = {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  description: string | null;
+};
 
 type ProductDraft = {
   name: string;
@@ -11,109 +22,149 @@ type ProductDraft = {
   description: string;
 };
 
-const initialProducts = [
-  { name: 'Fresh mangoes', category: 'Groceries', price: 'KSh 180', stock: '24 left', description: 'Locally sourced produce from trusted growers.' },
-  { name: 'Smart LED bulb', category: 'Home', price: 'KSh 860', stock: '16 left', description: 'Energy-efficient lighting for modern homes.' },
-  { name: 'Organic rice', category: 'Groceries', price: 'KSh 520', stock: '38 left', description: 'Premium rice packed for daily meals.' }
-];
-
-const emptyDraft: ProductDraft = {
-  name: '',
-  category: 'Groceries',
-  price: '',
-  stock: '',
-  description: ''
-};
+const emptyDraft: ProductDraft = { name: '', category: 'Groceries', price: '', stock: '', description: '' };
+const tokenKey = 'shopradar-access-token';
 
 export default function SellerProductsPage() {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft);
-  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const token = localStorage.getItem(tokenKey);
+    if (!token) {
+      setError('Sign in with your seller account to manage products.');
+      setLoading(false);
+      return () => controller.abort();
+    }
+    fetch(`${API_URL}/api/products/mine`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await getErrorMessage(response));
+        return response.json() as Promise<Product[]>;
+      })
+      .then(setProducts)
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Products could not be loaded.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, []);
 
   const handleFieldChange = (field: keyof ProductDraft, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
   };
 
-  const handleSubmit = () => {
-    const trimmedName = draft.name.trim();
-    const trimmedPrice = draft.price.trim();
-    const trimmedStock = draft.stock.trim();
-
-    if (!trimmedName || !trimmedPrice || !trimmedStock) {
-      setSaved(false);
-      return;
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    setStatus('');
+    try {
+      const token = localStorage.getItem(tokenKey);
+      if (!token) throw new Error('Sign in with your seller account to publish a product.');
+      const response = await fetch(`${API_URL}/api/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: draft.name.trim(),
+          category: draft.category,
+          price: Number(draft.price),
+          stock: Number(draft.stock),
+          description: draft.description.trim()
+        })
+      });
+      if (!response.ok) throw new Error(await getErrorMessage(response));
+      const created = await response.json() as Product;
+      setProducts((current) => [created, ...current]);
+      setDraft(emptyDraft);
+      setStatus('Product saved to your shop. It appears publicly after seller approval.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The product could not be saved.');
+    } finally {
+      setBusy(false);
     }
+  };
 
-    setProducts((current) => [{
-      name: trimmedName,
-      category: draft.category,
-      price: trimmedPrice,
-      stock: trimmedStock,
-      description: draft.description.trim() || 'Fresh listing added to your storefront.'
-    }, ...current]);
-
-    setDraft(emptyDraft);
-    setSaved(true);
+  const removeProduct = async (id: string) => {
+    setError('');
+    setStatus('');
+    try {
+      const token = localStorage.getItem(tokenKey);
+      if (!token) throw new Error('Sign in with your seller account to manage products.');
+      const response = await fetch(`${API_URL}/api/products/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error(await getErrorMessage(response));
+      setProducts((current) => current.filter((product) => product.id !== id));
+      setStatus('Product removed from your shop.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The product could not be removed.');
+    }
   };
 
   return (
     <SiteShell title="Products" subtitle="Update stock levels, pricing, and listing details for your store.">
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 420px) minmax(0, 1fr)', gap: '1.25rem', alignItems: 'start' }}>
-        <div style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 18, padding: '1.25rem', display: 'grid', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 18, padding: '1.25rem', display: 'grid', gap: '1rem' }}>
           <div style={{ fontWeight: 800, fontSize: '1.15rem' }}>Add product</div>
 
-          <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600 }}>
+          <label style={labelStyle}>
             Product name
-            <input value={draft.name} onChange={(event) => handleFieldChange('name', event.target.value)} style={inputStyle} placeholder="Fresh mangoes" />
+            <input required maxLength={120} value={draft.name} onChange={(event) => handleFieldChange('name', event.target.value)} style={inputStyle} placeholder="Fresh mangoes" />
           </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600 }}>
+            <label style={labelStyle}>
               Category
               <select value={draft.category} onChange={(event) => handleFieldChange('category', event.target.value)} style={inputStyle}>
-                <option>Groceries</option>
-                <option>Electronics</option>
-                <option>Home</option>
-                <option>Beauty</option>
-                <option>Fashion</option>
+                <option>Groceries</option><option>Electronics</option><option>Home</option><option>Beauty</option><option>Fashion</option>
               </select>
             </label>
-            <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600 }}>
-              Price
-              <input value={draft.price} onChange={(event) => handleFieldChange('price', event.target.value)} style={inputStyle} placeholder="KSh 180" />
+            <label style={labelStyle}>
+              Price (KSh)
+              <input required type="number" min="0.01" step="0.01" value={draft.price} onChange={(event) => handleFieldChange('price', event.target.value)} style={inputStyle} placeholder="180" />
             </label>
           </div>
 
-          <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600 }}>
+          <label style={labelStyle}>
             Stock
-            <input value={draft.stock} onChange={(event) => handleFieldChange('stock', event.target.value)} style={inputStyle} placeholder="24 left" />
+            <input required type="number" min="0" max="1000000" step="1" value={draft.stock} onChange={(event) => handleFieldChange('stock', event.target.value)} style={inputStyle} placeholder="24" />
           </label>
 
-          <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600 }}>
+          <label style={labelStyle}>
             Description
-            <textarea value={draft.description} onChange={(event) => handleFieldChange('description', event.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Describe the product and value proposition" />
+            <textarea maxLength={2000} value={draft.description} onChange={(event) => handleFieldChange('description', event.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Describe the product" />
           </label>
 
-          <button type="button" onClick={handleSubmit} style={{ background: 'var(--color-orange)', color: '#fff', border: 'none', borderRadius: 12, padding: '0.9rem 1.2rem', fontWeight: 800, cursor: 'pointer' }}>
-            Publish listing
+          <button type="submit" disabled={busy} style={{ background: 'var(--color-orange)', color: '#fff', border: 'none', borderRadius: 12, padding: '0.9rem 1.2rem', fontWeight: 800, cursor: busy ? 'wait' : 'pointer' }}>
+            {busy ? 'Saving…' : 'Publish listing'}
           </button>
-
-          {saved && (
-            <div style={{ background: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 12, padding: '0.8rem 1rem', fontWeight: 700 }}>
-              Product published to your store and search listings.
-            </div>
-          )}
-        </div>
+          {status ? <p role="status" style={{ margin: 0, color: '#166534', fontWeight: 600 }}>{status}</p> : null}
+          {error ? <p role="alert" style={{ margin: 0, color: '#b91c1c', fontWeight: 600 }}>{error}</p> : null}
+        </form>
 
         <div style={{ display: 'grid', gap: '1rem' }}>
+          {loading ? <p>Loading your inventory…</p> : null}
+          {!loading && products.length === 0 && !error ? <p style={{ color: '#64748b' }}>Your product list is empty. Add your first listing to get started.</p> : null}
           {products.map((product) => (
-            <div key={`${product.name}-${product.price}`} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 16, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+            <div key={product.id} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 16, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
               <div>
                 <div style={{ fontWeight: 700 }}>{product.name}</div>
-                <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '0.2rem' }}>{product.stock} • {product.category}</div>
-                <div style={{ color: '#475569', marginTop: '0.35rem' }}>{product.description}</div>
+                <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '0.2rem' }}>{product.stock} in stock · {product.category}</div>
+                {product.description ? <div style={{ color: '#475569', marginTop: '0.35rem' }}>{product.description}</div> : null}
               </div>
-              <span style={{ color: 'var(--color-orange)', fontWeight: 700, whiteSpace: 'nowrap' }}>{product.price}</span>
+              <div style={{ display: 'grid', justifyItems: 'end', gap: '0.65rem' }}>
+                <span style={{ color: 'var(--color-orange)', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatPrice(product.price)}</span>
+                <button type="button" onClick={() => void removeProduct(product.id)} style={{ background: 'transparent', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '0.35rem 0.6rem', cursor: 'pointer' }}>Remove</button>
+              </div>
             </div>
           ))}
         </div>
@@ -122,12 +173,17 @@ export default function SellerProductsPage() {
   );
 }
 
+async function getErrorMessage(response: Response) {
+  const body = await response.json().catch(() => null) as { message?: string | string[] } | null;
+  return Array.isArray(body?.message) ? body.message.join(' ') : body?.message ?? `Request failed (${response.status}).`;
+}
+
+function formatPrice(price: number) {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(price);
+}
+
+const labelStyle: CSSProperties = { display: 'grid', gap: '0.45rem', fontWeight: 600 };
 const inputStyle: CSSProperties = {
-  width: '100%',
-  border: '1px solid #cbd5e1',
-  borderRadius: 12,
-  padding: '0.8rem 0.9rem',
-  fontSize: '0.95rem',
-  background: '#f8fafc',
-  color: '#0f172a'
+  width: '100%', border: '1px solid #cbd5e1', borderRadius: 12, padding: '0.8rem 0.9rem',
+  fontSize: '0.95rem', background: '#f8fafc', color: '#0f172a'
 };

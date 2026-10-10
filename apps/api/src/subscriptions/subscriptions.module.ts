@@ -2,28 +2,19 @@ import { Controller, Get, Module } from '@nestjs/common';
 
 const plans = [
   {
-    id: 'trial',
-    name: 'Free Trial',
-    price: 0,
-    currency: 'KES',
-    billing: 'First month free',
-    features: ['1 storefront', 'Basic merchant dashboard', 'National ID verification required']
-  },
-  {
-    id: 'standard',
-    name: 'Standard Seller',
+    id: 'seller-business-monthly',
+    name: 'ShopRadar seller subscription',
     price: 1000,
     currency: 'KES',
-    billing: 'KSh 1,000 per month',
-    features: ['Unlimited listings', 'Insights dashboard', 'Trust and scam screening']
-  },
-  {
-    id: 'growth',
-    name: 'Growth Seller',
-    price: 1000,
-    currency: 'KES',
-    billing: 'KSh 1,000 per month + promo support',
-    features: ['Priority search placement', 'Campaign support', 'Verified business visibility']
+    billing: 'KSh 1,000 for 30 days',
+    features: [
+      'Complete your seller business registration',
+      'Unlock the full ShopRadar seller experience for your shop and products',
+      'Connect with shoppers and promote your business with videos up to 2 minutes 30 seconds',
+      'One-month free trial for new seller profiles (30 days from registration)',
+      'Valid for 30 days after M-Pesa confirms your KSh 1,000 payment',
+      'Shop approval is reviewed separately before public discovery'
+    ]
   }
 ];
 

@@ -1,8 +1,8 @@
-import { BadGatewayException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { AuthenticatedUser } from '../auth/jwt-auth.guard';
 import { PrismaService } from '../common/prisma.service';
-import { mpesaConfig } from '../config/env';
+import { apiConfig, mpesaConfig } from '../config/env';
 import { MpesaService } from './providers/mpesa/mpesa.service';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -17,16 +17,8 @@ export class PaymentsService {
     private readonly prisma: PrismaService
   ) {}
 
-  async initiatePayment(payload: { phoneNumber: string; amount: number; accountReference?: string }) {
-    return this.mpesaService.initiateStkPush({
-      phoneNumber: payload.phoneNumber,
-      amount: payload.amount,
-      accountReference: payload.accountReference ?? 'ShopRadar',
-      transactionDescription: 'ShopRadar subscription payment'
-    });
-  }
-
   async initiateSubscriptionPayment(user: AuthenticatedUser, phoneNumber: string) {
+    this.requirePaymentsEnabled();
     if (user.role !== 'SELLER') {
       throw new ForbiddenException('A seller account is required to pay for a seller subscription.');
     }
@@ -100,6 +92,7 @@ export class PaymentsService {
   }
 
   async handleMpesaCallback(token: string, body: unknown) {
+    this.requirePaymentsEnabled();
     if (!/^[a-f\d]{64}$/i.test(token)) {
       throw new ForbiddenException('The payment callback token is invalid.');
     }
@@ -193,5 +186,11 @@ export class PaymentsService {
     }
 
     return { checkoutRequestId: CheckoutRequestID, resultCode: ResultCode, amount, receipt };
+  }
+
+  private requirePaymentsEnabled() {
+    if (!apiConfig.paymentsEnabled) {
+      throw new ServiceUnavailableException('Payments are not configured yet. Seller payments will be available after Safaricom credentials are added.');
+    }
   }
 }

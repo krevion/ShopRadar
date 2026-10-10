@@ -8,7 +8,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleInit() {
     try {
       if (!process.env.DATABASE_URL) {
-        console.warn('DATABASE_URL is not set. Running the API in local fallback mode without a live Prisma database.');
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('DATABASE_URL must be configured before starting the production API.');
+        }
+        console.warn('DATABASE_URL is not set. Database-backed API routes are unavailable.');
         return;
       }
 
@@ -16,7 +19,21 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.databaseAvailable = true;
     } catch (error) {
       this.databaseAvailable = false;
-      console.warn('Prisma database unavailable; continuing in local fallback mode.', error instanceof Error ? error.message : error);
+      console.error('Prisma database connection failed.', error instanceof Error ? error.message : error);
+      if (process.env.NODE_ENV === 'production') {
+        throw error;
+      }
+    }
+  }
+
+  async isReady(): Promise<boolean> {
+    try {
+      await this.$queryRaw`SELECT 1`;
+      this.databaseAvailable = true;
+      return true;
+    } catch {
+      this.databaseAvailable = false;
+      return false;
     }
   }
 

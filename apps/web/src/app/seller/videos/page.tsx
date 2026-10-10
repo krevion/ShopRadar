@@ -269,7 +269,7 @@ export default function SellerVideosPage() {
           <div style={{ color: 'var(--color-orange)', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase', fontSize: '0.75rem' }}>Seller access required</div>
           <h2 style={{ margin: '0.5rem 0', color: '#10213f' }}>Your video studio is locked</h2>
           <p style={{ color: '#475569', lineHeight: 1.6 }}>{access?.reason ?? 'Sign in and complete seller activation to publish videos.'}</p>
-          <p style={{ color: '#64748b', lineHeight: 1.6 }}>Publishing requires a registered seller account and a successful KSh 1,000 subscription payment within the last 30 days. The API checks both conditions on every upload.</p>
+          <p style={{ color: '#64748b', lineHeight: 1.6 }}>New seller profiles get a one-month free trial. After it ends, a confirmed KSh 1,000 payment continues the seller toolkit for 30 days; shop approval is reviewed separately before publishing.</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.7rem', marginTop: '1rem' }}>
             <a href="/seller/register" style={linkButtonStyle}>Register / sign in</a>
             <a href="/seller/checkout" style={{ ...linkButtonStyle, background: '#0d2246' }}>Subscription checkout</a>

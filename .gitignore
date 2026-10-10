@@ -6,5 +6,7 @@ coverage
 .env
 .env.local
 .env.*.local
+.expo/
+uploads/
 *.log
 .DS_Store

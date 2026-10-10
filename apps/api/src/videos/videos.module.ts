@@ -22,7 +22,7 @@ import type { Request } from 'express';
 import { unlink } from 'fs/promises';
 import ffprobeStatic = require('ffprobe-static');
 import { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import { promisify } from 'util';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -31,7 +31,7 @@ import { PrismaService } from '../common/prisma.service';
 
 const MAX_VIDEO_SECONDS = 150;
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const uploadDirectory = join(process.cwd(), 'uploads', 'videos');
+const uploadDirectory = apiConfig.uploadsDirectory;
 const execFileAsync = promisify(execFile);
 
 class CreateVideoDto {
@@ -104,7 +104,10 @@ class VideosService {
         sellerProfile: {
           select: {
             id: true,
-            shopName: true
+            shopName: true,
+            status: true,
+            isVerified: true,
+            createdAt: true
           }
         },
         payments: {
@@ -127,11 +130,22 @@ class VideosService {
     if (!account.sellerProfile) {
       return { eligible: false, reason: 'Register your seller profile before uploading videos.' };
     }
-    if (account.payments.length === 0) {
-      return { eligible: false, reason: 'A successful KSh 1,000 subscription payment from the last 30 days is required.' };
+    if (account.sellerProfile.status !== 'APPROVED' || !account.sellerProfile.isVerified) {
+      return { eligible: false, reason: 'Your shop must be approved before publishing videos.' };
+    }
+    const trialEndsAt = new Date(account.sellerProfile.createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const freeTrialActive = now < trialEndsAt;
+    if (account.payments.length === 0 && !freeTrialActive) {
+      return { eligible: false, reason: 'Your one-month free trial has ended. A confirmed KSh 1,000 seller subscription is required to continue using seller video promotion.' };
     }
 
-    return { eligible: true, reason: 'Seller access is active.', sellerName: account.sellerProfile.shopName };
+    return {
+      eligible: true,
+      reason: freeTrialActive && account.payments.length === 0
+        ? 'Your one-month free seller trial is active.'
+        : 'Your paid seller subscription is active.',
+      sellerName: account.sellerProfile.shopName
+    };
   }
 
   async requireSellerAccess(user: AuthenticatedUser) {
@@ -144,10 +158,11 @@ class VideosService {
 
   async findAll() {
     if (!this.prisma.databaseAvailable) {
-      return [];
+      throw new ServiceUnavailableException('Videos are unavailable while the database is offline.');
     }
 
     const videos = await this.prisma.video.findMany({
+      where: { sellerProfile: { is: { status: 'APPROVED', isVerified: true } } },
       include: { sellerProfile: { select: { shopName: true, isVerified: true, bio: true, shop: { select: { city: true } } } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -403,8 +418,12 @@ class VideosController {
     }),
     limits: { fileSize: MAX_UPLOAD_BYTES },
     fileFilter: (_request, file, callback) => {
-      const acceptedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
-      callback(null, acceptedTypes.includes(file.mimetype));
+      const acceptedTypes: Record<string, string> = {
+        'video/mp4': '.mp4',
+        'video/webm': '.webm',
+        'video/quicktime': '.mov'
+      };
+      callback(null, acceptedTypes[file.mimetype] === extname(file.originalname).toLowerCase());
     }
   }))
   upload(
@@ -423,6 +442,6 @@ class VideosController {
 
 @Module({
   controllers: [VideosController],
-  providers: [VideosService, SellerVideoAccessGuard, JwtAuthGuard, PrismaService]
+  providers: [VideosService, SellerVideoAccessGuard, JwtAuthGuard]
 })
 export class VideosModule {}

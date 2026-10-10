@@ -52,23 +52,20 @@ Copy the example environment file and update values for your local environment:
 cp .env.example .env
 ```
 
-Required local values include:
-- DATABASE_URL
-- JWT_SECRET
-- MPESA credentials for sandbox testing
-- Google Maps keys for map features
-- object storage credentials when enabled
+Set `DATABASE_URL` to a working PostgreSQL database for account and catalogue features. Use a local development `JWT_SECRET`; production must use a unique random value of at least 32 characters. `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` is optional because the map has a no-key fallback.
+
+Payments stay disabled until Safaricom credentials and a public HTTPS callback are available. Video uploads need persistent storage in production. See [production deployment](docs/deployment.md) for the launch checklist.
 
 ## Database setup
 
 Start PostgreSQL locally or via Docker, then run:
 
 ```bash
-pnpm -C packages/database prisma generate
-pnpm -C packages/database prisma migrate dev
+pnpm --filter @shopradar/database prisma:generate
+pnpm --filter @shopradar/database migrate:dev
 ```
 
-If the database package has a local seed script, run it with the project-specific command.
+The project does not currently include a seed script. Create an administrator after migration with the `admin:create` script described in the deployment guide.
 
 ## Run the apps
 

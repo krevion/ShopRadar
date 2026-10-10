@@ -3,6 +3,8 @@
 import { type CSSProperties, type FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SiteShell } from '@/components/site-shell';
+import { SellerAddressFields, type SellerAddressDetails } from '@/components/seller-address-fields';
+import { ShopLocationMap, type ShopLocation } from '@/components/shop-location-map';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -18,6 +20,8 @@ export default function SellerRegisterPage() {
   const [password, setPassword] = useState('');
   const [shopName, setShopName] = useState('');
   const [bio, setBio] = useState('');
+  const [address, setAddress] = useState<SellerAddressDetails>({ buildingName: '', roomNumber: '', street: '' });
+  const [location, setLocation] = useState<ShopLocation | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
 
@@ -27,6 +31,9 @@ export default function SellerRegisterPage() {
     setStatus('');
 
     try {
+      if (mode === 'register' && !location) {
+        throw new Error('Choose your shop location on the map before creating your seller account.');
+      }
       const authResponse = await fetch(`${API_URL}/api/auth/${mode === 'register' ? 'register' : 'login'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,7 +58,7 @@ export default function SellerRegisterPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${auth.accessToken}`
           },
-          body: JSON.stringify({ shopName, bio })
+          body: JSON.stringify({ shopName, bio, ...address, ...location })
         });
         if (!profileResponse.ok) throw new Error(await getErrorMessage(profileResponse));
         router.push('/seller/checkout');
@@ -69,19 +76,22 @@ export default function SellerRegisterPage() {
       }
       if (access.reason.startsWith('Register your seller profile')) {
         if (!shopName.trim()) throw new Error('Enter your business name to complete seller registration.');
+        if (!location) throw new Error('Choose your shop location on the map to complete seller registration.');
         const profileResponse = await fetch(`${API_URL}/api/sellers/profile`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${auth.accessToken}`
           },
-          body: JSON.stringify({ shopName, bio })
+          body: JSON.stringify({ shopName, bio, ...address, ...location })
         });
         if (!profileResponse.ok) throw new Error(await getErrorMessage(profileResponse));
       }
       router.push('/seller/checkout');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Seller account could not be verified.');
+      setStatus(error instanceof TypeError && /fetch/i.test(error.message)
+        ? `ShopRadar could not reach the API at ${API_URL}. Make sure the local API server is running, then try again.`
+        : error instanceof Error ? error.message : 'Seller account could not be verified.');
     } finally {
       setBusy(false);
     }
@@ -94,7 +104,7 @@ export default function SellerRegisterPage() {
     >
       <div style={{ maxWidth: 720, margin: '0 auto', display: 'grid', gap: '1rem' }}>
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 16, padding: '1rem 1.2rem', color: '#9a4d00' }}>
-          <strong>Video publishing access:</strong> seller accounts need a registered profile and a successful KSh 1,000 subscription payment from the last 30 days.
+          <strong>Seller subscription:</strong> new seller profiles get a one-month free trial. After the trial, a confirmed KSh 1,000 payment continues your full ShopRadar seller experience, including shop and product tools, shopper engagement, and video promotion.
         </div>
 
         <form onSubmit={handleSubmit} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 18, padding: '1.25rem', display: 'grid', gap: '1rem' }}>
@@ -124,6 +134,13 @@ export default function SellerRegisterPage() {
             </label>
           ) : null}
 
+          <div style={{ display: 'grid', gap: '0.55rem' }}>
+            <strong>Shop location {mode === 'login' ? <span style={{ color: '#64748b', fontWeight: 400 }}>(needed only if you have not registered your shop)</span> : null}</strong>
+            {mode === 'register' ? <SellerAddressFields value={address} onChange={setAddress} /> : null}
+            <ShopLocationMap selectedLocation={location} onLocationSelect={setLocation} height={320} />
+            {location ? <span style={{ color: '#166534', fontSize: '0.86rem' }}>Location selected: {location.locationLabel ?? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`}</span> : null}
+          </div>
+
           <button type="submit" disabled={busy} style={{ border: 0, borderRadius: 12, padding: '0.9rem 1.2rem', background: busy ? '#94a3b8' : 'var(--color-orange)', color: '#fff', fontWeight: 800 }}>
             {busy ? 'Please wait…' : mode === 'register' ? 'Create seller account' : 'Sign in'}
           </button>
@@ -131,7 +148,7 @@ export default function SellerRegisterPage() {
         </form>
 
         <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem', lineHeight: 1.55 }}>
-          A submitted M-Pesa request is not treated as payment. The API grants video access only after Safaricom confirms the subscription payment.
+          A submitted M-Pesa request is not treated as payment. Your free trial starts when you register your business; after that, a 30-day paid subscription activates only after Safaricom confirms payment. Shop approval is reviewed separately.
         </p>
       </div>
     </SiteShell>

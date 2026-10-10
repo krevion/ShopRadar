@@ -1,18 +1,32 @@
-import { Controller, Get, Module } from '@nestjs/common';
+import { Controller, Get, Injectable, Module, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
+import { AdminAuthGuard } from '../auth/admin-auth.guard';
 
-const reports = [
-  { id: 'r1', title: 'Sales overview', value: 'KSh 128,400' },
-  { id: 'r2', title: 'New shoppers', value: '1,240' },
-  { id: 'r3', title: 'Conversion rate', value: '12.8%' }
-];
-
+@Injectable()
 class ReportsService {
-  findAll() {
-    return reports;
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll() {
+    if (!this.prisma.databaseAvailable) throw new ServiceUnavailableException('Reports are unavailable while the database is offline.');
+    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [newUsers, newOrders, payments, approvedSellers] = await Promise.all([
+      this.prisma.user.count({ where: { createdAt: { gte: monthAgo } } }),
+      this.prisma.order.count({ where: { createdAt: { gte: monthAgo } } }),
+      this.prisma.payment.aggregate({ where: { status: 'SUCCESSFUL', createdAt: { gte: monthAgo } }, _sum: { amount: true } }),
+      this.prisma.sellerProfile.count({ where: { status: 'APPROVED' } })
+    ]);
+
+    return [
+      { id: 'new-users', title: 'New shoppers · 30 days', value: String(newUsers) },
+      { id: 'orders', title: 'Orders · 30 days', value: String(newOrders) },
+      { id: 'confirmed-payments', title: 'Confirmed payments · 30 days', value: formatKes(Number(payments._sum.amount ?? 0)) },
+      { id: 'approved-sellers', title: 'Approved sellers', value: String(approvedSellers) }
+    ];
   }
 }
 
 @Controller('reports')
+@UseGuards(AdminAuthGuard)
 class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
@@ -22,8 +36,12 @@ class ReportsController {
   }
 }
 
+function formatKes(amount: number) {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(amount);
+}
+
 @Module({
   controllers: [ReportsController],
-  providers: [ReportsService]
+  providers: [ReportsService, AdminAuthGuard]
 })
 export class ReportsModule {}
