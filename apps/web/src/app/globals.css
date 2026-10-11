@@ -1291,6 +1291,146 @@ body::before {
 .shopradar-primary-button { flex: 0 0 auto; padding: 0.68rem 1rem; border-radius: 11px; font-size: 0.8rem; }
 .shopradar-primary-button:hover, .shopradar-cta-button:hover { box-shadow: 0 12px 28px rgba(236, 109, 66, 0.3), inset 0 1px rgba(255, 255, 255, 0.42); }
 
+.shopradar-app-notice-backdrop {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(3, 14, 25, 0.72);
+  backdrop-filter: blur(10px);
+  animation: app-notice-fade-in 0.22s ease-out both;
+}
+
+.shopradar-app-notice {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: min(100%, 490px);
+  padding: clamp(1.5rem, 6vw, 2.25rem);
+  border: 1px solid rgba(119, 229, 232, 0.28);
+  border-radius: 25px;
+  background:
+    radial-gradient(circle at 80% 25%, rgba(32, 186, 197, 0.23), transparent 34%),
+    linear-gradient(145deg, #0a1d31, #0c2b42 72%, #104051);
+  color: #e9fbff;
+  box-shadow: 0 30px 90px rgba(0, 7, 16, 0.5), inset 0 1px rgba(255, 255, 255, 0.09);
+  animation: radar-card-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.shopradar-app-notice::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: linear-gradient(rgba(134, 219, 226, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(134, 219, 226, 0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+  content: '';
+  mask-image: linear-gradient(120deg, transparent 12%, #000 100%);
+}
+
+.shopradar-app-notice-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border: 1px solid rgba(190, 235, 240, 0.16);
+  border-radius: 50%;
+  background: rgba(215, 250, 255, 0.07);
+  color: #e7fbff;
+  cursor: pointer;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.shopradar-app-notice-close:hover { background: rgba(215, 250, 255, 0.15); }
+.shopradar-app-notice-close:focus-visible, .shopradar-app-notice-action:focus-visible { outline: 3px solid #6ce6e4; outline-offset: 3px; }
+
+.shopradar-app-notice-orbit {
+  position: absolute;
+  z-index: -1;
+  top: 2rem;
+  right: -3rem;
+  width: 12rem;
+  height: 12rem;
+  border: 1px solid rgba(103, 230, 232, 0.2);
+  border-radius: 50%;
+  box-shadow: 0 0 0 17px rgba(90, 222, 225, 0.045), 0 0 0 36px rgba(90, 222, 225, 0.035);
+  animation: shell-drift 9s ease-in-out infinite alternate;
+}
+
+.shopradar-app-notice-orbit span {
+  position: absolute;
+  top: 1.35rem;
+  left: 1.5rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #62e0df;
+  box-shadow: 0 0 18px 5px rgba(70, 224, 223, 0.5);
+}
+
+.shopradar-app-notice-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.8rem;
+  color: #8ee7e5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.shopradar-app-notice-kicker span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #69e4dc;
+  box-shadow: 0 0 12px rgba(105, 228, 220, 0.9);
+  animation: app-notice-pulse 1.8s ease-in-out infinite;
+}
+
+.shopradar-app-notice h2 {
+  max-width: 370px;
+  margin: 0;
+  color: #f3fcff;
+  font-size: clamp(1.8rem, 7vw, 2.35rem);
+  letter-spacing: -0.055em;
+  line-height: 1.06;
+}
+
+.shopradar-app-notice-copy {
+  max-width: 390px;
+  margin: 1rem 0 1.4rem;
+  color: rgba(223, 241, 247, 0.78);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.shopradar-app-notice-action {
+  min-height: 2.9rem;
+  padding: 0.75rem 1.05rem;
+  border: 1px solid rgba(126, 237, 234, 0.38);
+  border-radius: 12px;
+  background: linear-gradient(125deg, #27b9bd, #13798b);
+  box-shadow: 0 10px 25px rgba(20, 153, 163, 0.25), inset 0 1px rgba(255, 255, 255, 0.25);
+  color: #f4ffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shopradar-app-notice-action:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(20, 153, 163, 0.34), inset 0 1px rgba(255, 255, 255, 0.3); }
+
+@keyframes app-notice-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes app-notice-pulse { 0%, 100% { opacity: 0.55; transform: scale(0.88); } 50% { opacity: 1; transform: scale(1.12); } }
+
 .shopradar-content {
   position: relative;
   z-index: 1;
@@ -1460,6 +1600,10 @@ body::before {
   .shopradar-shell-atmosphere span,
   .shopradar-brand-mark::after,
   .shopradar-page-heading-copy .shopradar-kicker::before,
+  .shopradar-app-notice-backdrop,
+  .shopradar-app-notice,
+  .shopradar-app-notice-orbit,
+  .shopradar-app-notice-kicker span,
   .phone-card,
   .mini-product,
   .pin { animation: none !important; }

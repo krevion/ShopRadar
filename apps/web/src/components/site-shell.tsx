@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
@@ -25,6 +25,15 @@ type SiteShellProps = {
 
 export function SiteShell({ title, subtitle, action, immersive = false, children }: SiteShellProps) {
   const pathname = usePathname();
+  const [appNoticeOpen, setAppNoticeOpen] = useState(false);
+
+  const closeAppNoticeOnEscape = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') setAppNoticeOpen(false);
+  };
+
+  const closeAppNoticeOnBackdrop = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) setAppNoticeOpen(false);
+  };
 
   return (
     <main className={`shopradar-page-shell${immersive ? ' shopradar-page-shell-immersive' : ''}`} style={{ minHeight: '100vh', padding: immersive ? 0 : '1.5rem' }}>
@@ -51,8 +60,51 @@ export function SiteShell({ title, subtitle, action, immersive = false, children
             ))}
           </nav>
 
-          <button className="shopradar-primary-button">Get app</button>
+          <button
+            className="shopradar-primary-button"
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={appNoticeOpen}
+            onClick={() => setAppNoticeOpen(true)}
+          >
+            Get app
+          </button>
         </header>
+
+        {appNoticeOpen ? (
+          <div
+            className="shopradar-app-notice-backdrop"
+            role="presentation"
+            onMouseDown={closeAppNoticeOnBackdrop}
+            onKeyDown={closeAppNoticeOnEscape}
+          >
+            <section
+              className="shopradar-app-notice"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="shopradar-app-notice-title"
+            >
+              <button
+                className="shopradar-app-notice-close"
+                type="button"
+                aria-label="Close app availability notice"
+                autoFocus
+                onClick={() => setAppNoticeOpen(false)}
+              >
+                ×
+              </button>
+              <div className="shopradar-app-notice-orbit" aria-hidden="true"><span /></div>
+              <p className="shopradar-app-notice-kicker"><span /> Launch update</p>
+              <h2 id="shopradar-app-notice-title">The ShopRadar app is coming soon</h2>
+              <p className="shopradar-app-notice-copy">
+                It is not available to download yet. You can keep discovering local shops and products here on the website.
+              </p>
+              <button className="shopradar-app-notice-action" type="button" onClick={() => setAppNoticeOpen(false)}>
+                Continue exploring
+              </button>
+            </section>
+          </div>
+        ) : null}
 
         <section className="shopradar-content">
           <div className="shopradar-hero-heading">
