@@ -1,19 +1,22 @@
 import { Controller, Get, Injectable, Module, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { ResponseCache } from '../common/response-cache';
 
 @Injectable()
 class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly cache: ResponseCache) {}
 
   async findAll() {
     if (!this.prisma.databaseAvailable) throw new ServiceUnavailableException('Categories are unavailable while the database is offline.');
-    const categories = await this.prisma.product.findMany({
-      where: { isActive: true, shop: { is: { isActive: true, seller: { is: { status: 'APPROVED', isVerified: true } } } } },
-      select: { category: true },
-      distinct: ['category'],
-      orderBy: { category: 'asc' }
+    return this.cache.getOrSet('public:categories', 60_000, async () => {
+      const categories = await this.prisma.product.findMany({
+        where: { isActive: true, shop: { is: { isActive: true, seller: { is: { status: 'APPROVED', isVerified: true } } } } },
+        select: { category: true },
+        distinct: ['category'],
+        orderBy: { category: 'asc' }
+      });
+      return categories.map(({ category }) => ({ id: category.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name: category }));
     });
-    return categories.map(({ category }) => ({ id: category.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name: category }));
   }
 }
 

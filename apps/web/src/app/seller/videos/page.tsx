@@ -199,7 +199,7 @@ export default function SellerVideosPage() {
   return (
     <SiteShell
       title="Seller video studio"
-      subtitle="Upload or record a short video to introduce your shop and products."
+      subtitle="Upload or record a short video to introduce your business, products, or services."
       action={<a href="/videos" style={{ color: '#9a4d00', fontWeight: 800 }}>← Back to videos</a>}
     >
       {checkingAccess ? (

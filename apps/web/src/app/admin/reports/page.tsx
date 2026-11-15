@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { SiteShell } from '@/components/site-shell';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const tokenKey = 'shopradar-access-token';
+const tokenKey = 'shopradar-admin-token';
 type Report = { id: string; title: string; value: string };
 
 export default function AdminReportsPage() {
@@ -13,7 +13,7 @@ export default function AdminReportsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem(tokenKey);
+    const token = sessionStorage.getItem(tokenKey);
     if (!token) {
       setError('Sign in with an admin account to view marketplace reports.');
       setLoading(false);

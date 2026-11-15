@@ -3,10 +3,14 @@ import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import { hashPassword, verifyPassword } from '@shopradar/auth';
 import { PrismaService } from '../common/prisma.service';
+import { FailedLoginLimiter } from '../common/failed-login-limiter';
 import { apiConfig } from '../config/env';
+import { USER_TOKEN_AUDIENCE, USER_TOKEN_ISSUER } from './token-claims';
 
 @Injectable()
 export class AuthService {
+  private readonly loginLimiter = new FailedLoginLimiter(10, 15 * 60 * 1000);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService
@@ -38,23 +42,33 @@ export class AuthService {
     }
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, ip: string) {
     if (!this.prisma.databaseAvailable) {
       throw new ServiceUnavailableException('Sign in is temporarily unavailable because the database is offline.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    const normalizedEmail = email.trim().toLowerCase();
+    this.loginLimiter.assertAllowed(ip);
+    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user?.active || !(await verifyPassword(password, user.passwordHash))) {
+      this.loginLimiter.recordFailure(ip);
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    this.loginLimiter.clear(ip);
     return this.buildAuthResponse(user);
   }
 
   private buildAuthResponse(user: { id: string; email: string; role: string }) {
     const token = this.jwtService.sign(
       { sub: user.id, email: user.email, role: user.role },
-      { secret: apiConfig.jwtSecret, expiresIn: apiConfig.jwtExpiresIn as `${number}${'ms' | 's' | 'm' | 'h' | 'd' | 'w' | 'y'}` }
+      {
+        secret: apiConfig.jwtSecret,
+        algorithm: 'HS256',
+        issuer: USER_TOKEN_ISSUER,
+        audience: USER_TOKEN_AUDIENCE,
+        expiresIn: apiConfig.jwtExpiresIn as `${number}${'ms' | 's' | 'm' | 'h' | 'd' | 'w' | 'y'}`
+      }
     );
 
     return {

@@ -4,9 +4,9 @@ import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { SiteShell } from '@/components/site-shell';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const tokenKey = 'shopradar-access-token';
+const tokenKey = 'shopradar-admin-token';
 
-type Seller = { id: string; email: string; business: string; locationLabel: string | null; buildingName: string | null; roomNumber: string | null; street: string | null; status: 'PENDING' | 'APPROVED' | 'REJECTED'; verified: boolean; createdAt: string };
+type Seller = { id: string; email: string; business: string; providerType: 'SHOP' | 'SERVICE_PROVIDER'; serviceCategory: string | null; serviceArea: string | null; contactPhone: string | null; locationLabel: string | null; buildingName: string | null; roomNumber: string | null; street: string | null; status: 'PENDING' | 'APPROVED' | 'REJECTED'; verified: boolean; hasComplimentaryAccess: boolean; complimentaryAccessGrantedAt: string | null; createdAt: string };
 
 export default function AdminSellersPage() {
   const [sellers, setSellers] = useState<Seller[]>([]);
@@ -16,7 +16,7 @@ export default function AdminSellersPage() {
   const [notice, setNotice] = useState('');
 
   const loadSellers = useCallback(async (signal?: AbortSignal) => {
-    const token = localStorage.getItem(tokenKey);
+    const token = sessionStorage.getItem(tokenKey);
     if (!token) throw new Error('Sign in with an admin account to review sellers.');
     const response = await fetch(`${API_URL}/api/admin/sellers`, { headers: { Authorization: `Bearer ${token}` }, signal });
     if (!response.ok) throw new Error(await getErrorMessage(response));
@@ -36,7 +36,7 @@ export default function AdminSellersPage() {
     setError('');
     setNotice('');
     try {
-      const token = localStorage.getItem(tokenKey);
+      const token = sessionStorage.getItem(tokenKey);
       if (!token) throw new Error('Sign in with an admin account to review sellers.');
       const response = await fetch(`${API_URL}/api/admin/sellers/${encodeURIComponent(seller.id)}/status`, {
         method: 'PATCH',
@@ -54,11 +54,34 @@ export default function AdminSellersPage() {
     }
   };
 
+  const updateComplimentaryAccess = async (seller: Seller, enabled: boolean) => {
+    setBusyId(seller.id);
+    setError('');
+    setNotice('');
+    try {
+      const token = sessionStorage.getItem(tokenKey);
+      if (!token) throw new Error('Sign in with an admin account to manage seller access.');
+      const response = await fetch(`${API_URL}/api/admin/sellers/${encodeURIComponent(seller.id)}/complimentary-access`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled })
+      });
+      if (!response.ok) throw new Error(await getErrorMessage(response));
+      const updated = await response.json() as { hasComplimentaryAccess: boolean; complimentaryAccessGrantedAt: string | null };
+      setSellers((current) => current.map((entry) => entry.id === seller.id ? { ...entry, ...updated } : entry));
+      setNotice(`${seller.business} complimentary seller access ${enabled ? 'granted' : 'revoked'}.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Complimentary seller access could not be updated.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <SiteShell title="Sellers" subtitle="Review seller registrations and manage marketplace approval.">
       <div style={{ display: 'grid', gap: '1rem' }}>
         <div style={{ background: '#f8fafc', border: '1px solid var(--color-border)', borderRadius: 16, padding: '1rem 1.2rem', color: '#334155' }}>
-          Approved seller profiles become visible in shop discovery and product search. Status changes notify the seller.
+          Approved shops and service providers become visible in local discovery. Status changes notify the seller.
         </div>
         {loading ? <p>Loading seller applications…</p> : null}
         {error ? <p role="alert" style={{ margin: 0, color: '#b91c1c', fontWeight: 600 }}>{error}</p> : null}
@@ -68,13 +91,18 @@ export default function AdminSellersPage() {
           <article key={seller.id} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 16, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontWeight: 700 }}>{seller.business}</div>
-              <div style={{ color: '#64748b', marginTop: '0.25rem' }}>{seller.email}{formatSellerAddress(seller) ? ` · ${formatSellerAddress(seller)}` : ''}</div>
+              <div style={{ color: '#64748b', marginTop: '0.25rem' }}>{seller.providerType === 'SERVICE_PROVIDER' ? 'Service provider' : 'Shop'}{seller.serviceCategory ? ` · ${seller.serviceCategory}` : ''}</div>
+              <div style={{ color: '#64748b', marginTop: '0.25rem' }}>{seller.email}{seller.contactPhone ? ` · ${seller.contactPhone}` : ''}{seller.serviceArea ? ` · ${seller.serviceArea}` : formatSellerAddress(seller) ? ` · ${formatSellerAddress(seller)}` : ''}</div>
               <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.25rem' }}>Submitted {new Date(seller.createdAt).toLocaleDateString()}</div>
+              {seller.hasComplimentaryAccess ? <div style={{ color: '#166534', fontSize: '0.82rem', fontWeight: 700, marginTop: '0.35rem' }}>Complimentary paid-feature access{seller.complimentaryAccessGrantedAt ? ` · granted ${new Date(seller.complimentaryAccessGrantedAt).toLocaleDateString()}` : ''}</div> : null}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <span style={{ color: seller.verified ? 'var(--color-success)' : '#b45309', fontWeight: 700 }}>{seller.status}</span>
               {seller.status !== 'APPROVED' ? <button type="button" disabled={Boolean(busyId)} onClick={() => void updateStatus(seller, 'APPROVED')} style={buttonStyle(busyId === seller.id, true)}>Approve</button> : null}
               {seller.status !== 'REJECTED' ? <button type="button" disabled={Boolean(busyId)} onClick={() => void updateStatus(seller, 'REJECTED')} style={buttonStyle(busyId === seller.id, false)}>Reject</button> : null}
+              <button type="button" disabled={Boolean(busyId)} onClick={() => void updateComplimentaryAccess(seller, !seller.hasComplimentaryAccess)} style={buttonStyle(Boolean(busyId), !seller.hasComplimentaryAccess)}>
+                {seller.hasComplimentaryAccess ? 'Revoke free access' : 'Grant free access'}
+              </button>
             </div>
           </article>
         ))}

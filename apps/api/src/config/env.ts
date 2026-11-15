@@ -27,7 +27,14 @@ const jwtSecret = process.env.JWT_SECRET?.trim();
 if (isProduction && (!jwtSecret || jwtSecret.length < 32 || /replace-with|local-dev|changeme/i.test(jwtSecret))) {
   throw new Error('JWT_SECRET must be a unique secret with at least 32 characters in production.');
 }
-const jwtExpiresIn = process.env.JWT_EXPIRES_IN?.trim() || '7d';
+const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim() ?? '';
+if (adminPasswordHash && !/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(adminPasswordHash)) {
+  throw new Error('ADMIN_PASSWORD_HASH must be a bcrypt password hash.');
+}
+if (isProduction && !adminPasswordHash) {
+  throw new Error('ADMIN_PASSWORD_HASH must be configured in production.');
+}
+const jwtExpiresIn = process.env.JWT_EXPIRES_IN?.trim() || '1d';
 if (!/^\d+(ms|s|m|h|d|w|y)$/.test(jwtExpiresIn)) {
   throw new Error('JWT_EXPIRES_IN must be a duration such as 15m or 7d.');
 }
@@ -39,6 +46,11 @@ const configuredPort = Number(
 );
 if (!Number.isInteger(configuredPort) || configuredPort < 1 || configuredPort > 65535) {
   throw new Error('API_PORT or PORT must be a valid TCP port.');
+}
+
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 0);
+if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
+  throw new Error('TRUST_PROXY_HOPS must be an integer between 0 and 10.');
 }
 
 const webOrigins = (process.env.WEB_ORIGIN ?? 'http://localhost:3000')
@@ -109,9 +121,11 @@ if (isProduction && (!configuredUploadsDirectory || !isAbsolute(configuredUpload
 
 export const apiConfig = {
   port: configuredPort,
+  trustProxyHops,
   nodeEnv,
   jwtSecret: jwtSecret || 'local-dev-secret',
   jwtExpiresIn,
+  adminPasswordHash,
   publicUrl,
   webOrigins,
   uploadsDirectory: resolve(configuredUploadsDirectory || resolve(__dirname, '../../../../uploads/videos')),

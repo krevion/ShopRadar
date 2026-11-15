@@ -1,6 +1,7 @@
 import { Controller, Get, Injectable, Module, Query, ServiceUnavailableException } from '@nestjs/common';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { PrismaService } from '../common/prisma.service';
+import { ResponseCache } from '../common/response-cache';
 
 class SearchQueryDto {
   @IsOptional()
@@ -11,58 +12,87 @@ class SearchQueryDto {
 
 @Injectable()
 class SearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly cache: ResponseCache) {}
 
   async search(keyword?: string) {
     if (!this.prisma.databaseAvailable) throw new ServiceUnavailableException('Search is unavailable while the database is offline.');
     const q = keyword?.trim();
     if (!q) return [];
 
-    const [products, shops, sellers] = await Promise.all([
-      this.prisma.product.findMany({
-        where: {
-          isActive: true,
-          shop: { is: { isActive: true, seller: { is: { status: 'APPROVED', isVerified: true } } } },
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { category: { contains: q, mode: 'insensitive' } },
-            { description: { contains: q, mode: 'insensitive' } }
-          ]
-        },
-        select: { id: true, name: true, category: true, shop: { select: { name: true } } },
-        take: 12
-      }),
-      this.prisma.shop.findMany({
-        where: {
-          isActive: true,
-          seller: { is: { status: 'APPROVED', isVerified: true } },
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { city: { contains: q, mode: 'insensitive' } },
-            { description: { contains: q, mode: 'insensitive' } }
-          ]
-        },
-        select: { id: true, name: true, city: true },
-        take: 12
-      }),
-      this.prisma.sellerProfile.findMany({
-        where: {
-          status: 'APPROVED',
-          isVerified: true,
-          shopName: { contains: q, mode: 'insensitive' }
-        },
-        select: { id: true, shopName: true },
-        take: 12
-      })
-    ]);
+    return this.cache.getOrSet(`public:search:${q.toLowerCase()}`, 10_000, async () => {
+      const [products, shops, sellers] = await Promise.all([
+        this.prisma.product.findMany({
+          where: {
+            isActive: true,
+            shop: { is: { isActive: true, seller: { is: { status: 'APPROVED', isVerified: true } } } },
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { category: { contains: q, mode: 'insensitive' } },
+              { description: { contains: q, mode: 'insensitive' } }
+            ]
+          },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            shop: {
+              select: {
+                name: true,
+                seller: { select: { id: true, shopName: true } }
+              }
+            }
+          },
+          take: 12
+        }),
+        this.prisma.shop.findMany({
+          where: {
+            isActive: true,
+            seller: { is: { status: 'APPROVED', isVerified: true } },
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { city: { contains: q, mode: 'insensitive' } },
+              { description: { contains: q, mode: 'insensitive' } }
+            ]
+          },
+          select: { id: true, name: true, city: true },
+          take: 12
+        }),
+        this.prisma.sellerProfile.findMany({
+          where: {
+            status: 'APPROVED',
+            isVerified: true,
+            OR: [
+              { shopName: { contains: q, mode: 'insensitive' } },
+              { serviceCategory: { contains: q, mode: 'insensitive' } },
+              { serviceArea: { contains: q, mode: 'insensitive' } }
+            ]
+          },
+          select: { id: true, shopName: true, providerType: true, serviceCategory: true },
+          take: 12
+        })
+      ]);
 
-    return [
-      ...products.map((product) => ({ id: product.id, type: 'product', name: product.name, category: product.category, shop: product.shop.name })),
-      ...shops.map((shop) => ({ id: shop.id, type: 'shop', name: shop.name, city: shop.city })),
-      ...sellers.map((seller) => ({ id: seller.id, type: 'seller', name: seller.shopName }))
-    ].map((result) => ({ ...result, match: score(result.name, q) }))
-      .sort((a, b) => b.match - a.match)
-      .slice(0, 20);
+      return [
+        ...products.map((product) => ({
+          id: product.id,
+          type: 'product',
+          name: product.name,
+          category: product.category,
+          shop: product.shop.name,
+          sellerId: product.shop.seller.id,
+          sellerName: product.shop.seller.shopName
+        })),
+        ...shops.map((shop) => ({ id: shop.id, type: 'shop', name: shop.name, city: shop.city })),
+        ...sellers.map((seller) => ({
+          id: seller.id,
+          type: seller.providerType === 'SERVICE_PROVIDER' ? 'service_provider' : 'seller',
+          name: seller.shopName,
+          category: seller.serviceCategory ?? undefined
+        }))
+      ].map((result) => ({ ...result, match: score(result.name, q) }))
+        .sort((a, b) => b.match - a.match)
+        .slice(0, 20);
+    });
   }
 }
 

@@ -1,11 +1,14 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { USER_TOKEN_AUDIENCE, USER_TOKEN_ISSUER } from './token-claims';
 
 export type AuthenticatedUser = {
   sub: string;
   email: string;
-  role: string;
+  role: 'CUSTOMER' | 'SELLER' | 'ADMIN';
+  iat?: number;
+  exp?: number;
 };
 
 type AuthenticatedRequest = Request & { user?: AuthenticatedUser };
@@ -24,8 +27,18 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<AuthenticatedUser>(token);
-      if (!payload.sub || !payload.email || !payload.role) {
+      const payload = await this.jwtService.verifyAsync<AuthenticatedUser>(token, {
+        algorithms: ['HS256'],
+        issuer: USER_TOKEN_ISSUER,
+        audience: USER_TOKEN_AUDIENCE
+      });
+      if (
+        !payload.sub ||
+        !payload.email ||
+        typeof payload.iat !== 'number' ||
+        typeof payload.exp !== 'number' ||
+        (payload.role !== 'CUSTOMER' && payload.role !== 'SELLER')
+      ) {
         throw new UnauthorizedException('The access token is invalid.');
       }
 

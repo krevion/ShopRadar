@@ -6,7 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
-    "admin:create": "node dist/scripts/create-admin.js",
+    "admin:hash": "node dist/scripts/hash-admin-password.js",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "bcryptjs": "^3.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "compression": "^1.8.2",
     "dotenv": "^16.4.5",
     "ffprobe-static": "^3.1.0",
     "multer": "^2.4.0",

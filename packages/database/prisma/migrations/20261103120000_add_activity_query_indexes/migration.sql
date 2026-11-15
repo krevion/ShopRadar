@@ -1,0 +1,11 @@
+CREATE INDEX "User_createdAt_idx" ON "User"("createdAt");
+CREATE INDEX "SellerProfile_createdAt_idx" ON "SellerProfile"("createdAt");
+CREATE INDEX "SellerProfile_status_createdAt_idx" ON "SellerProfile"("status", "createdAt");
+CREATE INDEX "Shop_createdAt_idx" ON "Shop"("createdAt");
+CREATE INDEX "Product_createdAt_idx" ON "Product"("createdAt");
+CREATE INDEX "Order_createdAt_idx" ON "Order"("createdAt");
+CREATE INDEX "Payment_status_createdAt_idx" ON "Payment"("status", "createdAt");
+CREATE INDEX "VideoLike_createdAt_idx" ON "VideoLike"("createdAt");
+CREATE INDEX "VideoComment_createdAt_idx" ON "VideoComment"("createdAt");
+CREATE INDEX "SellerFavorite_createdAt_idx" ON "SellerFavorite"("createdAt");
+CREATE INDEX "SellerMessage_createdAt_idx" ON "SellerMessage"("createdAt");

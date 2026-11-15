@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: shopradar-api
+    runtime: node
+    plan: "0.5c-512mb"
+    region: frankfurt
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @shopradar/database prisma:generate && pnpm exec turbo run build --filter=@shopradar/api...
+    preDeployCommand: pnpm --filter @shopradar/database migrate:deploy
+    startCommand: pnpm --filter @shopradar/api start
+    healthCheckPath: /api/ready
+    autoDeployTrigger: commit
+    disk:
+      name: shopradar-api-uploads
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shopradar-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: WEB_ORIGIN
+        value: https://shopradar-web.onrender.com
+      - key: API_PUBLIC_URL
+        value: https://shopradar-api.onrender.com
+      - key: UPLOADS_DIR
+        value: /var/data/videos
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: PAYMENTS_ENABLED
+        value: "false"
+      - key: MPESA_CALLBACK_URL
+        value: https://shopradar-api.onrender.com/api/payments/mpesa/callback
+
+  - type: web
+    name: shopradar-web
+    runtime: node
+    plan: "0.5c-512mb"
+    region: frankfurt
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @shopradar/web build
+    startCommand: pnpm --filter @shopradar/web start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://shopradar-api.onrender.com
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://shopradar-web.onrender.com
+
+databases:
+  - name: shopradar-db
+    databaseName: shopradar
+    user: shopradar
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"

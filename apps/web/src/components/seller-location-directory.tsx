@@ -8,6 +8,9 @@ const NEARBY_RADIUS_KM = 10;
 
 type Seller = ShopMapPoint & {
   business: string;
+  providerType: 'SHOP' | 'SERVICE_PROVIDER';
+  serviceCategory: string | null;
+  serviceArea: string | null;
   verified: boolean;
   status: string;
 };
@@ -98,9 +101,9 @@ export function SellerLocationDirectory() {
         <div className="radar-intro-copy">
           <div className="radar-live-label"><span /> ShopRadar / local discovery</div>
           <h2 id="radar-intro-title">Find your next favorite <em>around the corner.</em></h2>
-          <p>Explore local storefronts, see what is nearby, and get a direct route to the shops you want to visit.</p>
+          <p>Explore local shops and services, see what is nearby, and connect with providers in your area.</p>
           <div className="radar-feature-pills" aria-label="Map features">
-            <span><i className="radar-pill-dot radar-pill-orange" />Live shop map</span>
+            <span><i className="radar-pill-dot radar-pill-orange" />Local listings map</span>
             <span><i className="radar-pill-dot radar-pill-cyan" />Direct directions</span>
           </div>
         </div>
@@ -109,7 +112,7 @@ export function SellerLocationDirectory() {
           <div className="radar-orbit radar-orbit-outer"><span className="radar-orbit-satellite satellite-one" /><span className="radar-orbit-satellite satellite-two" /></div>
           <div className="radar-orbit radar-orbit-inner"><span className="radar-orbit-satellite satellite-three" /></div>
           <div className="radar-orbit-core"><span className="radar-core-pulse" /><svg viewBox="0 0 48 48" fill="none"><path d="M24 42s14-13.4 14-25a14 14 0 1 0-28 0c0 11.6 14 25 14 25Z" stroke="currentColor" strokeWidth="2.5"/><circle cx="24" cy="17" r="5" stroke="currentColor" strokeWidth="2.5"/><path d="M30.5 31.5 39 40" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg></div>
-          <div className="radar-float-tag radar-float-tag-top"><span className="radar-float-icon">+</span><span><strong>LOCAL SIGNAL</strong><small>Shops in your orbit</small></span></div>
+          <div className="radar-float-tag radar-float-tag-top"><span className="radar-float-icon">+</span><span><strong>LOCAL SIGNAL</strong><small>Local providers nearby</small></span></div>
           <div className="radar-float-tag radar-float-tag-bottom"><span className="radar-wave-icon"><i /><i /><i /></span><span><strong>DISCOVER MORE</strong><small>Your city, mapped</small></span></div>
         </div>
       </section>
@@ -117,32 +120,32 @@ export function SellerLocationDirectory() {
       <div className="radar-toolbar">
         <div className="radar-location-status">
           <span className={`radar-status-beacon${userLocation ? ' is-active' : ''}`} />
-          <span>{loading ? 'Scanning for local shops...' : userLocation
-            ? `${nearbySellers.length} shop${nearbySellers.length === 1 ? '' : 's'} within ${NEARBY_RADIUS_KM} km`
-            : `${mappedSellers.length} shop${mappedSellers.length === 1 ? '' : 's'} mapped and ready to explore`}</span>
+          <span>{loading ? 'Scanning for local listings...' : userLocation
+            ? `${nearbySellers.length} listing${nearbySellers.length === 1 ? '' : 's'} within ${NEARBY_RADIUS_KM} km`
+            : `${mappedSellers.length} listing${mappedSellers.length === 1 ? '' : 's'} mapped and ready to explore`}</span>
         </div>
         <button type="button" onClick={findNearby} disabled={locating} className="radar-locate-button">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.8"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-          {locating ? 'Locating you...' : userLocation ? 'Refresh my location' : 'Find shops near me'}
+          {locating ? 'Locating you...' : userLocation ? 'Refresh my location' : 'Find listings near me'}
         </button>
       </div>
       {error ? <p role="status" className="radar-alert">{error}</p> : null}
 
       <section className="radar-map-panel" aria-labelledby="radar-map-title">
         <div className="radar-map-heading">
-          <div><span className="radar-section-kicker">Explore the area</span><h2 id="radar-map-title">Shop map</h2></div>
+          <div><span className="radar-section-kicker">Explore the area</span><h2 id="radar-map-title">Local discovery map</h2></div>
           <span className={`radar-map-state${userLocation ? ' is-active' : ''}`}><i />{userLocation ? 'Location synced' : 'Map online'}</span>
         </div>
-        {userLocation ? <div className="radar-map-legend" role="status"><span><i className="radar-legend-blue" />You are here <small>+/- {Math.round(userLocation.accuracy)} m</small></span><span><i className="radar-legend-orange" />Nearby shops</span></div> : null}
+        {userLocation ? <div className="radar-map-legend" role="status"><span><i className="radar-legend-blue" />You are here <small>+/- {Math.round(userLocation.accuracy)} m</small></span><span><i className="radar-legend-orange" />Nearby listings</span></div> : null}
         <div className="radar-map-frame"><ShopLocationMap markers={mapPoints} height={480} /></div>
       </section>
 
       <section className="radar-shops-section" aria-labelledby="radar-shops-title">
         <div className="radar-shops-heading">
-          <div><span className="radar-section-kicker">Curated around you</span><h2 id="radar-shops-title">Shops in your orbit</h2></div>
+          <div><span className="radar-section-kicker">Curated around you</span><h2 id="radar-shops-title">Local businesses and services</h2></div>
           {!loading ? <span className="radar-results-count">{sortedSellers.length} {sortedSellers.length === 1 ? 'place' : 'places'}</span> : null}
         </div>
-        {loading ? <div className="radar-empty-state"><span className="radar-loading-orbit" /><strong>Scanning the neighborhood</strong><span>Finding shops to put on your map.</span></div> : sortedSellers.length ? <div className="radar-shop-grid">
+        {loading ? <div className="radar-empty-state"><span className="radar-loading-orbit" /><strong>Scanning the neighborhood</strong><span>Finding local listings to put on your map.</span></div> : sortedSellers.length ? <div className="radar-shop-grid">
           {sortedSellers.map((seller, index) => {
             const hasLocation = Number.isFinite(seller.latitude) && Number.isFinite(seller.longitude);
             const distance = hasLocation && userLocation
@@ -151,15 +154,16 @@ export function SellerLocationDirectory() {
             return <article key={seller.id} className="radar-shop-card" style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}>
               <div className="radar-shop-card-top"><span className="radar-shop-glyph"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none"><path d="M4 10.5h16v10H4zM3 10.5 5 4h14l2 6.5M8 10.5v10m8-10v10M3 10.5a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"/></svg></span>{seller.verified ? <span className="radar-verified"><i />Verified</span> : null}</div>
               <h3>{seller.business}</h3>
-              <p className="radar-shop-address"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none"><path d="M10 18s6-5.7 6-10.5a6 6 0 1 0-12 0C4 12.3 10 18 10 18Z" stroke="currentColor" strokeWidth="1.6"/><circle cx="10" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.6"/></svg>{formatSellerAddress(seller) || (hasLocation ? `${seller.latitude.toFixed(5)}, ${seller.longitude.toFixed(5)}` : 'Location not added yet')}</p>
+                {seller.providerType === 'SERVICE_PROVIDER' ? <p className="radar-shop-address">{seller.serviceCategory}{seller.serviceArea ? ` · ${seller.serviceArea}` : ''}</p> : null}
+                <p className="radar-shop-address"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none"><path d="M10 18s6-5.7 6-10.5a6 6 0 1 0-12 0C4 12.3 10 18 10 18Z" stroke="currentColor" strokeWidth="1.6"/><circle cx="10" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.6"/></svg>{seller.serviceArea || formatSellerAddress(seller) || (hasLocation ? `${seller.latitude.toFixed(5)}, ${seller.longitude.toFixed(5)}` : 'Location not added yet')}</p>
               <div className="radar-shop-card-footer">
                 {distance !== null ? <span className="radar-distance"><i />{distance.toFixed(1)} km away</span> : <span className="radar-distance radar-distance-muted">{hasLocation ? 'Map location available' : 'Location pending'}</span>}
-                <div className="radar-shop-actions"><a className="radar-shop-view" href={`/sellers/${encodeURIComponent(seller.id)}`}>View shop <span aria-hidden="true">&#8599;</span></a>{hasLocation ? <a className="radar-shop-directions" href={directionsUrl(seller.latitude, seller.longitude)} target="_blank" rel="noopener noreferrer" aria-label={`Get directions to ${seller.business}`} title="Get directions"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none"><path d="M10 18s6-5.7 6-10.5a6 6 0 1 0-12 0C4 12.3 10 18 10 18Z" stroke="currentColor" strokeWidth="1.7"/><circle cx="10" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.7"/></svg></a> : null}</div>
+                <div className="radar-shop-actions"><a className="radar-shop-view" href={`/sellers/${encodeURIComponent(seller.id)}`}>View {seller.providerType === 'SERVICE_PROVIDER' ? 'service' : 'shop'} <span aria-hidden="true">&#8599;</span></a>{hasLocation ? <a className="radar-shop-directions" href={directionsUrl(seller.latitude, seller.longitude)} target="_blank" rel="noopener noreferrer" aria-label={`Get directions to ${seller.business}`} title="Get directions"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none"><path d="M10 18s6-5.7 6-10.5a6 6 0 1 0-12 0C4 12.3 10 18 10 18Z" stroke="currentColor" strokeWidth="1.7"/><circle cx="10" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.7"/></svg></a> : null}</div>
               </div>
             </article>;
           })}
-        </div> : <div className="radar-empty-state"><span className="radar-empty-glyph">+</span><strong>No shops detected yet</strong><span>Local storefronts will appear here as they join ShopRadar.</span></div>}
-        {!loading && sellers.length > mappedSellers.length ? <p className="radar-map-note">Some shops have not added a precise map location, so they cannot appear as pins or provide directions yet.</p> : null}
+        </div> : <div className="radar-empty-state"><span className="radar-empty-glyph">+</span><strong>No listings detected yet</strong><span>Local shops and service providers will appear here as they join ShopRadar.</span></div>}
+        {!loading && sellers.length > mappedSellers.length ? <p className="radar-map-note">Some listings have not added a map location, so they cannot appear as pins or provide directions yet.</p> : null}
       </section>
     </div>
   );

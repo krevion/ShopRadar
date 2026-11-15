@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
 }
 
 enum Role {
@@ -17,6 +19,19 @@ enum SellerStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum SellerType {
+  SHOP
+  SERVICE_PROVIDER
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+  INTERNSHIP
 }
 
 enum OrderStatus {
@@ -35,74 +50,100 @@ enum PaymentStatus {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  passwordHash String
-  role         Role           @default(CUSTOMER)
-  active       Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  sellerProfile SellerProfile?
-  orders       Order[]
-  payments     Payment[]
-  videoLikes   VideoLike[]
-  videoComments VideoComment[]
+  id              String           @id @default(cuid())
+  email           String           @unique
+  passwordHash    String
+  role            Role             @default(CUSTOMER)
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  sellerProfile   SellerProfile?
+  orders          Order[]
+  payments        Payment[]
+  videoLikes      VideoLike[]
+  videoComments   VideoComment[]
   sellerFavorites SellerFavorite[]
-  sellerMessages SellerMessage[]
-  notifications Notification[]
+  sellerMessages  SellerMessage[]
+  notifications   Notification[]
+
+  @@index([createdAt])
 }
 
 model SellerProfile {
-  id          String       @id @default(cuid())
-  userId      String       @unique
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shopName    String
-  bio         String?
-  locationLabel String?
-  buildingName String?
-  roomNumber  String?
-  street      String?
-  latitude    Float?
-  longitude   Float?
-  status      SellerStatus @default(PENDING)
-  isVerified  Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  shop        Shop?
-  videos      Video[]
-  favorites   SellerFavorite[]
-  messages    SellerMessage[]
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName        String
+  providerType    SellerType       @default(SHOP)
+  serviceCategory String?
+  serviceArea     String?
+  contactPhone    String?
+  bio             String?
+  locationLabel   String?
+  buildingName    String?
+  roomNumber      String?
+  street          String?
+  latitude        Float?
+  longitude       Float?
+  status          SellerStatus     @default(PENDING)
+  isVerified      Boolean          @default(false)
+  hasComplimentaryAccess Boolean    @default(false)
+  complimentaryAccessGrantedAt DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  shop            Shop?
+  videos          Video[]
+  favorites       SellerFavorite[]
+  messages        SellerMessage[]
+  jobListings     JobListing[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([shopName(ops: raw("gin_trgm_ops"))], type: Gin, map: "SellerProfile_shopName_trgm_idx")
+  @@index([serviceCategory(ops: raw("gin_trgm_ops"))], type: Gin, map: "SellerProfile_serviceCategory_trgm_idx")
+  @@index([serviceArea(ops: raw("gin_trgm_ops"))], type: Gin, map: "SellerProfile_serviceArea_trgm_idx")
 }
 
 model Shop {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
-  slug        String    @unique
+  slug        String        @unique
   description String?
   address     String?
   city        String?
-  sellerId    String    @unique
+  sellerId    String        @unique
   seller      SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   products    Product[]
+
+  @@index([createdAt])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Shop_name_trgm_idx")
+  @@index([city(ops: raw("gin_trgm_ops"))], type: Gin, map: "Shop_city_trgm_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "Shop_description_trgm_idx")
 }
 
 model Product {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   shopId      String
-  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop        Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
   name        String
-  slug        String   @unique
+  slug        String      @unique
   description String?
-  price       Decimal  @db.Decimal(10, 2)
-  stock       Int      @default(0)
+  price       Decimal     @db.Decimal(10, 2)
+  stock       Int         @default(0)
   category    String
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
   orderItems  OrderItem[]
+
+  @@index([createdAt])
+  @@index([isActive, createdAt])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Product_name_trgm_idx")
+  @@index([category(ops: raw("gin_trgm_ops"))], type: Gin, map: "Product_category_trgm_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "Product_description_trgm_idx")
 }
 
 model Order {
@@ -115,6 +156,8 @@ model Order {
   updatedAt DateTime    @updatedAt
   items     OrderItem[]
   payments  Payment[]
+
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -145,22 +188,24 @@ model Payment {
   receipt           String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+
+  @@index([status, createdAt])
 }
 
 model Video {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   sellerProfileId String
-  sellerProfile   SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  sellerProfile   SellerProfile  @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
   title           String
   category        String
   duration        String
   durationSeconds Int
   description     String
   videoUrl        String
-  views           Int           @default(0)
-  likes           Int           @default(0)
-  comments        Int           @default(0)
-  createdAt       DateTime      @default(now())
+  views           Int            @default(0)
+  likes           Int            @default(0)
+  comments        Int            @default(0)
+  createdAt       DateTime       @default(now())
   likeRecords     VideoLike[]
   commentRecords  VideoComment[]
 
@@ -176,6 +221,7 @@ model VideoLike {
   createdAt DateTime @default(now())
 
   @@unique([videoId, userId])
+  @@index([createdAt])
 }
 
 model VideoComment {
@@ -188,6 +234,7 @@ model VideoComment {
   createdAt DateTime @default(now())
 
   @@index([videoId, createdAt])
+  @@index([createdAt])
 }
 
 model SellerFavorite {
@@ -199,6 +246,7 @@ model SellerFavorite {
   createdAt       DateTime      @default(now())
 
   @@unique([userId, sellerProfileId])
+  @@index([createdAt])
 }
 
 model SellerMessage {
@@ -211,17 +259,44 @@ model SellerMessage {
   createdAt       DateTime      @default(now())
 
   @@index([sellerProfileId, createdAt])
+  @@index([createdAt])
+}
+
+model JobListing {
+  id              String        @id @default(cuid())
+  sellerProfileId String
+  sellerProfile   SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  title           String
+  description     String
+  employmentType  EmploymentType
+  location        String?
+  salaryRange     String?
+  requirements    String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([sellerProfileId, isActive, createdAt])
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String
   title     String
   body      String
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId, readAt, createdAt])
+}
+
+model SitePageView {
+  id        String   @id @default(cuid())
+  path      String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([path, createdAt])
 }

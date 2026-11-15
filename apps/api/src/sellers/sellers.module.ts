@@ -1,15 +1,41 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, Module, NotFoundException, Patch, Post, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
-import { IsNumber, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Injectable, Module, NotFoundException, Patch, Post, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import { IsBoolean, IsEnum, IsNumber, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { EmploymentType, SellerType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PrismaService } from '../common/prisma.service';
+import { ResponseCache } from '../common/response-cache';
 
 class RegisterSellerProfileDto {
+  @IsOptional()
+  @IsEnum(SellerType)
+  providerType?: SellerType;
+
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/)
   @MaxLength(120)
   shopName!: string;
+
+  @ValidateIf((dto: RegisterSellerProfileDto) => dto.providerType === SellerType.SERVICE_PROVIDER)
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/\S/)
+  @MaxLength(80)
+  serviceCategory?: string;
+
+  @ValidateIf((dto: RegisterSellerProfileDto) => dto.providerType === SellerType.SERVICE_PROVIDER)
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/\S/)
+  @MaxLength(200)
+  serviceArea?: string;
+
+  @ValidateIf((dto: RegisterSellerProfileDto) => dto.providerType === SellerType.SERVICE_PROVIDER)
+  @IsString()
+  @Matches(/^(?:\+?254|0)?[17]\d{8}$/, { message: 'Enter a valid Kenyan mobile number, for example 0712345678.' })
+  contactPhone?: string;
 
   @IsString()
   @MaxLength(500)
@@ -85,54 +111,144 @@ class CreateSellerMessageDto {
   body!: string;
 }
 
+class CreateJobListingDto {
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/\S/)
+  @MaxLength(120)
+  title!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/\S/)
+  @MaxLength(5000)
+  description!: string;
+
+  @IsEnum(EmploymentType)
+  employmentType!: EmploymentType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  salaryRange?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  requirements?: string;
+}
+
+class UpdateJobListingStatusDto {
+  @IsBoolean()
+  isActive!: boolean;
+}
+
+@Injectable()
 class SellersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly cache: ResponseCache) {}
 
   async findAll() {
     this.requireDatabase('Seller directory is unavailable while the database is offline.');
-    const sellers = await this.prisma.sellerProfile.findMany({
-      where: { status: 'APPROVED', isVerified: true },
-      include: { shop: true },
-      orderBy: { createdAt: 'desc' },
-      take: 200
-    });
+    return this.cache.getOrSet('public:sellers', 5_000, async () => {
+      const sellers = await this.prisma.sellerProfile.findMany({
+        where: { status: 'APPROVED', isVerified: true },
+        include: { shop: true },
+        orderBy: { createdAt: 'desc' },
+        take: 200
+      });
 
-    return sellers.map((seller) => ({
-      id: seller.id,
-      name: seller.shop?.name ?? seller.shopName,
-      business: seller.shop?.name ?? seller.shopName,
-      locationLabel: seller.locationLabel,
-      buildingName: seller.buildingName,
-      roomNumber: seller.roomNumber,
-      street: seller.street,
-      latitude: seller.latitude,
-      longitude: seller.longitude,
-      verified: seller.isVerified,
-      status: seller.status
-    }));
+      return sellers.map((seller) => ({
+        id: seller.id,
+        name: seller.shop?.name ?? seller.shopName,
+        business: seller.shop?.name ?? seller.shopName,
+        providerType: seller.providerType,
+        serviceCategory: seller.serviceCategory,
+        serviceArea: seller.serviceArea,
+        locationLabel: seller.locationLabel,
+        buildingName: seller.buildingName,
+        roomNumber: seller.roomNumber,
+        street: seller.street,
+        contactPhone: seller.contactPhone,
+        latitude: seller.latitude,
+        longitude: seller.longitude,
+        verified: seller.isVerified,
+        status: seller.status
+      }));
+    });
   }
 
   async findOne(id: string) {
     this.requireDatabase('Seller profiles are unavailable while the database is offline.');
-    const seller = await this.prisma.sellerProfile.findFirst({
-      where: { id, status: 'APPROVED', isVerified: true },
-      include: { shop: true }
+    return this.cache.getOrSet(`public:seller:${id}`, 5_000, async () => {
+      const seller = await this.prisma.sellerProfile.findFirst({
+        where: { id, status: 'APPROVED', isVerified: true },
+        include: {
+          shop: true,
+          jobListings: {
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' }
+          }
+        }
+      });
+      if (!seller) throw new NotFoundException('Seller was not found.');
+      return {
+        id: seller.id,
+        name: seller.shop?.name ?? seller.shopName,
+        shopName: seller.shop?.name ?? seller.shopName,
+        providerType: seller.providerType,
+        serviceCategory: seller.serviceCategory,
+        serviceArea: seller.serviceArea,
+        contactPhone: seller.contactPhone,
+        bio: seller.bio,
+        locationLabel: seller.locationLabel,
+        buildingName: seller.buildingName,
+        roomNumber: seller.roomNumber,
+        street: seller.street,
+        latitude: seller.latitude,
+        longitude: seller.longitude,
+        verified: seller.isVerified,
+        status: seller.status,
+        jobs: seller.jobListings
+      };
     });
-    if (!seller) throw new NotFoundException('Seller was not found.');
-    return {
-      id: seller.id,
-      name: seller.shop?.name ?? seller.shopName,
-      shopName: seller.shop?.name ?? seller.shopName,
-      bio: seller.bio,
-      locationLabel: seller.locationLabel,
-      buildingName: seller.buildingName,
-      roomNumber: seller.roomNumber,
-      street: seller.street,
-      latitude: seller.latitude,
-      longitude: seller.longitude,
-      verified: seller.isVerified,
-      status: seller.status
-    };
+  }
+
+  async findMyJobs(user: AuthenticatedUser) {
+    const profileId = await this.getSellerProfileId(user);
+    return this.prisma.jobListing.findMany({
+      where: { sellerProfileId: profileId },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async createJob(user: AuthenticatedUser, dto: CreateJobListingDto) {
+    const profileId = await this.getSellerProfileId(user);
+    return this.prisma.jobListing.create({
+      data: {
+        sellerProfileId: profileId,
+        title: dto.title.trim(),
+        description: dto.description.trim(),
+        employmentType: dto.employmentType,
+        location: dto.location?.trim() || null,
+        salaryRange: dto.salaryRange?.trim() || null,
+        requirements: dto.requirements?.trim() || null
+      }
+    });
+  }
+
+  async updateJobStatus(user: AuthenticatedUser, id: string, isActive: boolean) {
+    const profileId = await this.getSellerProfileId(user);
+    const result = await this.prisma.jobListing.updateMany({
+      where: { id, sellerProfileId: profileId },
+      data: { isActive }
+    });
+    if (result.count === 0) throw new NotFoundException('Job listing was not found in your business profile.');
+    return this.prisma.jobListing.findUniqueOrThrow({ where: { id } });
   }
 
   async findCurrent(user: AuthenticatedUser) {
@@ -158,6 +274,10 @@ class SellersService {
     }
 
     const shopName = dto.shopName.trim();
+    const providerType = dto.providerType ?? SellerType.SHOP;
+    const serviceCategory = dto.serviceCategory?.trim() || null;
+    const serviceArea = dto.serviceArea?.trim() || null;
+    const contactPhone = dto.contactPhone ? normalizeKenyanPhone(dto.contactPhone) : null;
     const bio = dto.bio.trim();
     const locationLabel = dto.locationLabel?.trim() || null;
     const buildingName = dto.buildingName?.trim() || null;
@@ -167,6 +287,10 @@ class SellersService {
       data: {
         userId: user.sub,
         shopName,
+        providerType,
+        serviceCategory,
+        serviceArea,
+        contactPhone,
         bio: bio || null,
         locationLabel,
         buildingName,
@@ -176,14 +300,14 @@ class SellersService {
         longitude: dto.longitude,
         status: 'PENDING',
         isVerified: false,
-        shop: {
+        shop: providerType === SellerType.SHOP ? {
           create: {
             name: shopName,
             slug: `${slugify(shopName).slice(0, 80) || 'shop'}-${randomUUID().slice(0, 8)}`,
             description: bio || null,
             address: formatShopAddress({ buildingName, roomNumber, street, locationLabel })
           }
-        }
+        } : undefined
       },
       include: { shop: { select: { id: true, slug: true } } }
     });
@@ -191,6 +315,7 @@ class SellersService {
     return {
       id: profile.id,
       shopName: profile.shopName,
+      providerType: profile.providerType,
       shopId: profile.shop?.id ?? null,
       status: profile.status,
       isVerified: profile.isVerified
@@ -363,10 +488,28 @@ class SellersService {
     const account = await this.prisma.user.findUnique({ where: { id: user.sub }, select: { active: true } });
     if (!account?.active) throw new ForbiddenException('This account is not active.');
   }
+
+  private async getSellerProfileId(user: AuthenticatedUser) {
+    if (user.role !== 'SELLER') throw new ForbiddenException('A seller account is required to manage job listings.');
+    await this.requireActiveUser(user);
+    const profile = await this.prisma.sellerProfile.findUnique({
+      where: { userId: user.sub },
+      select: { id: true }
+    });
+    if (!profile) throw new NotFoundException('Register a seller profile before managing job listings.');
+    return profile.id;
+  }
 }
 
 function slugify(value: string) {
   return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function normalizeKenyanPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('254')) return `+${digits}`;
+  if (digits.startsWith('0')) return `+254${digits.slice(1)}`;
+  return `+254${digits}`;
 }
 
 function formatShopAddress(location: {
@@ -390,6 +533,27 @@ class SellersController {
   @Get()
   findAll() {
     return this.sellersService.findAll();
+  }
+
+  @Get('jobs/mine')
+  @UseGuards(JwtAuthGuard)
+  findMyJobs(@Req() request: Request & { user: AuthenticatedUser }) {
+    return this.sellersService.findMyJobs(request.user);
+  }
+
+  @Post('jobs')
+  @UseGuards(JwtAuthGuard)
+  createJob(@Req() request: Request & { user: AuthenticatedUser }, @Body() dto: CreateJobListingDto) {
+    return this.sellersService.createJob(request.user, dto);
+  }
+
+  @Patch('jobs/:id')
+  @UseGuards(JwtAuthGuard)
+  updateJobStatus(
+    @Req() request: Request & { user: AuthenticatedUser; params: { id: string } },
+    @Body() dto: UpdateJobListingStatusDto
+  ) {
+    return this.sellersService.updateJobStatus(request.user, request.params.id, dto.isActive);
   }
 
   @Get('analytics')

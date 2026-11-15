@@ -1,33 +1,36 @@
 import { BadRequestException, Controller, Get, Injectable, Module, Query, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { ResponseCache } from '../common/response-cache';
 
 @Injectable()
 class ShopsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly cache: ResponseCache) {}
 
   async findAll() {
     this.requireDatabase();
-    const shops = await this.prisma.shop.findMany({
-      where: { isActive: true, seller: { is: { status: 'APPROVED', isVerified: true } } },
-      include: { seller: { select: { latitude: true, longitude: true, locationLabel: true, buildingName: true, roomNumber: true, street: true, bio: true, isVerified: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 200
+    return this.cache.getOrSet('public:shops', 10_000, async () => {
+      const shops = await this.prisma.shop.findMany({
+        where: { isActive: true, seller: { is: { status: 'APPROVED', isVerified: true } } },
+        include: { seller: { select: { latitude: true, longitude: true, locationLabel: true, buildingName: true, roomNumber: true, street: true, bio: true, isVerified: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 200
+      });
+      return shops.map((shop) => ({
+        id: shop.id,
+        name: shop.name,
+        city: shop.city,
+        address: shop.address ?? shop.seller.locationLabel,
+        buildingName: shop.seller.buildingName,
+        roomNumber: shop.seller.roomNumber,
+        street: shop.seller.street,
+        locationLabel: shop.seller.locationLabel,
+        latitude: shop.seller.latitude,
+        longitude: shop.seller.longitude,
+        specialty: shop.description ?? shop.seller.bio,
+        verified: shop.seller.isVerified,
+        distanceKm: null
+      }));
     });
-    return shops.map((shop) => ({
-      id: shop.id,
-      name: shop.name,
-      city: shop.city,
-      address: shop.address ?? shop.seller.locationLabel,
-      buildingName: shop.seller.buildingName,
-      roomNumber: shop.seller.roomNumber,
-      street: shop.seller.street,
-      locationLabel: shop.seller.locationLabel,
-      latitude: shop.seller.latitude,
-      longitude: shop.seller.longitude,
-      specialty: shop.description ?? shop.seller.bio,
-      verified: shop.seller.isVerified,
-      distanceKm: null
-    }));
   }
 
   async findNearby(latitude?: string, longitude?: string, radius?: string) {

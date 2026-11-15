@@ -4,6 +4,7 @@ const sellerLinks = [
   { title: 'Register your business', detail: 'Create a seller profile and submit your shop location for review.', href: '/seller/register', action: 'Seller registration' },
   { title: 'Manage your shop', detail: 'Update your shop location and business information.', href: '/seller/shop', action: 'Shop settings' },
   { title: 'Manage products', detail: 'Add, update, and remove products from your shop.', href: '/seller/products', action: 'Product listings' },
+  { title: 'Hire employees', detail: 'Post open roles and manage job listings shown on your business profile.', href: '/seller/jobs', action: 'Manage jobs' },
   { title: 'Seller dashboard', detail: 'Review video engagement and shopper messages.', href: '/seller/dashboard', action: 'Open dashboard' },
   { title: 'Subscription', detail: 'Start with a one-month free trial, then continue the full ShopRadar seller experience for KSh 1,000 per month.', href: '/seller/subscription', action: 'Plan details' }
 ];

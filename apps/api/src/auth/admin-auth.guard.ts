@@ -1,44 +1,50 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { Request } from 'express';
-import { PrismaService } from '../common/prisma.service';
+import type { Request, Response } from 'express';
 import { AuthenticatedUser } from './jwt-auth.guard';
+import { ADMIN_TOKEN_AUDIENCE, ADMIN_TOKEN_ISSUER, ADMIN_TOKEN_TTL_SECONDS } from './token-claims';
 
 type AdminRequest = Request & { user?: AuthenticatedUser };
 
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService
-  ) {}
+  constructor(private readonly jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AdminRequest>();
+    const response = context.switchToHttp().getResponse<Response>();
+    response.setHeader('Cache-Control', 'no-store, private');
+    response.setHeader('Pragma', 'no-cache');
     const authorization = request.headers.authorization;
     const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : '';
     if (!token) throw new UnauthorizedException('A valid bearer token is required.');
 
     let payload: AuthenticatedUser;
     try {
-      payload = await this.jwtService.verifyAsync<AuthenticatedUser>(token);
+      payload = await this.jwtService.verifyAsync<AuthenticatedUser>(token, {
+        algorithms: ['HS256'],
+        issuer: ADMIN_TOKEN_ISSUER,
+        audience: ADMIN_TOKEN_AUDIENCE
+      });
     } catch {
       throw new UnauthorizedException('The access token is invalid or expired.');
     }
 
-    if (!payload.sub || !payload.email) throw new UnauthorizedException('The access token is invalid.');
-    if (!this.prisma.databaseAvailable) {
-      throw new ServiceUnavailableException('Admin access cannot be verified while the database is offline.');
+    const now = Math.floor(Date.now() / 1000);
+    if (
+      payload.sub !== 'shopradar-configured-admin' ||
+      payload.email !== 'site-owner@shopradar.local' ||
+      payload.role !== 'ADMIN' ||
+      typeof payload.iat !== 'number' ||
+      typeof payload.exp !== 'number' ||
+      payload.iat > now ||
+      payload.exp - payload.iat > ADMIN_TOKEN_TTL_SECONDS ||
+      payload.iat < now - ADMIN_TOKEN_TTL_SECONDS
+    ) {
+      throw new UnauthorizedException('A valid site-owner admin session is required.');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, email: true, role: true, active: true }
-    });
-    if (!user?.active) throw new UnauthorizedException('This account is not active.');
-    if (user.role !== 'ADMIN') throw new ForbiddenException('An admin account is required.');
-
-    request.user = { sub: user.id, email: user.email, role: user.role };
+    request.user = payload;
     return true;
   }
 }

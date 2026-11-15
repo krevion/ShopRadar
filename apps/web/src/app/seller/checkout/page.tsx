@@ -63,7 +63,7 @@ export default function SellerCheckoutPage() {
         if (cancelled) return;
         setPaymentStatus(payment.status);
         if (payment.status === 'SUCCESSFUL') {
-          setStatus('Payment confirmed. Your full ShopRadar seller subscription is active for 30 days.');
+          setStatus('Payment confirmed. Your ShopRadar seller subscription is active for 30 days.');
         } else if (payment.status === 'FAILED') {
           setStatus('Payment was not completed. Please start another payment request.');
         } else {
@@ -122,7 +122,7 @@ export default function SellerCheckoutPage() {
   return (
     <SiteShell
       title="Seller subscription"
-      subtitle="Your first month is free. After the trial, a verified KSh 1,000 M-Pesa payment continues the full ShopRadar seller experience for 30 days."
+      subtitle="Your first month is free. After the trial, a verified KSh 1,000 M-Pesa payment continues your shop or service provider subscription for 30 days."
       action={<a href="/seller/register" style={{ color: '#9a4d00', fontWeight: 800 }}>Seller sign in</a>}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(260px, 0.85fr)', gap: '1.25rem', alignItems: 'start' }}>
@@ -159,10 +159,10 @@ export default function SellerCheckoutPage() {
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: '1rem', display: 'grid', gap: '0.8rem' }}>
             <div><strong>Free trial</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>First 30 days are free for new seller profiles</div></div>
             <div><strong>After the trial</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>KSh 1,000 for each additional 30 days, paid through M-Pesa</div></div>
-            <div><strong>Business tools</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Complete registration and manage your shop and products</div></div>
-            <div><strong>Shopper reach</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Engage shoppers and promote with videos up to 2 minutes 30 seconds</div></div>
+            <div><strong>Business tools</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Complete registration and manage your shop or service profile</div></div>
+            <div><strong>Customer reach</strong><div style={{ color: '#64748b', fontSize: '0.85rem' }}>Connect with customers and promote with videos up to 2 minutes 30 seconds</div></div>
           </div>
-          <p style={{ margin: 0, color: '#64748b', lineHeight: 1.55 }}>The subscription is for the complete seller experience. Your shop must still pass seller approval before it appears publicly.</p>
+          <p style={{ margin: 0, color: '#64748b', lineHeight: 1.55 }}>The subscription is for the complete seller experience. Your profile must still pass seller approval before it appears publicly.</p>
         </aside>
       </div>
     </SiteShell>

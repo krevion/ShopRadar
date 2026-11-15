@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PrismaService } from '../common/prisma.service';
+import { ResponseCache } from '../common/response-cache';
 
 class ProductQueryDto {
   @IsOptional()
@@ -73,29 +74,32 @@ const approvedShopFilter = { isActive: true, seller: { is: { status: 'APPROVED' 
 
 @Injectable()
 class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly cache: ResponseCache) {}
 
   async findAll(query?: string, limit = 100) {
     this.requireDatabase();
     const q = query?.trim();
-    const products = await this.prisma.product.findMany({
-      where: {
-        isActive: true,
-        shop: { is: approvedShopFilter },
-        ...(q ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { category: { contains: q, mode: 'insensitive' } },
-            { description: { contains: q, mode: 'insensitive' } },
-            { shop: { is: { name: { contains: q, mode: 'insensitive' } } } }
-          ]
-        } : {})
-      },
-      include: { shop: { select: { id: true, name: true, city: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: limit
+    const cacheKey = `public:products:${q?.toLowerCase() ?? ''}:${limit}`;
+    return this.cache.getOrSet(cacheKey, 10_000, async () => {
+      const products = await this.prisma.product.findMany({
+        where: {
+          isActive: true,
+          shop: { is: approvedShopFilter },
+          ...(q ? {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { category: { contains: q, mode: 'insensitive' } },
+              { description: { contains: q, mode: 'insensitive' } },
+              { shop: { is: { name: { contains: q, mode: 'insensitive' } } } }
+            ]
+          } : {})
+        },
+        include: { shop: { select: { id: true, name: true, city: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit
+      });
+      return products.map((product) => ({ ...product, price: Number(product.price), shop: product.shop.name, shopId: product.shop.id, city: product.shop.city }));
     });
-    return products.map((product) => ({ ...product, price: Number(product.price), shop: product.shop.name, shopId: product.shop.id, city: product.shop.city }));
   }
 
   async getFeatured() {

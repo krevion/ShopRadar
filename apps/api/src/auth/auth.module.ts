@@ -4,13 +4,19 @@ import { apiConfig } from '../config/env';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { USER_TOKEN_AUDIENCE, USER_TOKEN_ISSUER } from './token-claims';
 
 @Module({
   imports: [
     JwtModule.register({
       global: true,
       secret: apiConfig.jwtSecret,
-      signOptions: { expiresIn: apiConfig.jwtExpiresIn as `${number}${'ms' | 's' | 'm' | 'h' | 'd' | 'w' | 'y'}` }
+      signOptions: {
+        algorithm: 'HS256',
+        issuer: USER_TOKEN_ISSUER,
+        audience: USER_TOKEN_AUDIENCE,
+        expiresIn: apiConfig.jwtExpiresIn as `${number}${'ms' | 's' | 'm' | 'h' | 'd' | 'w' | 'y'}`
+      }
     })
   ],
   controllers: [AuthController],

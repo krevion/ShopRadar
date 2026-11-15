@@ -28,6 +28,7 @@ import { promisify } from 'util';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { apiConfig } from '../config/env';
 import { PrismaService } from '../common/prisma.service';
+import { ResponseCache } from '../common/response-cache';
 
 const MAX_VIDEO_SECONDS = 150;
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
@@ -83,7 +84,7 @@ type SellerAccess = {
 class VideosService {
   private readonly logger = new Logger(VideosService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly cache: ResponseCache) {}
 
   async getSellerAccess(user: AuthenticatedUser): Promise<SellerAccess> {
     if (user.role !== 'SELLER') {
@@ -107,7 +108,8 @@ class VideosService {
             shopName: true,
             status: true,
             isVerified: true,
-            createdAt: true
+            createdAt: true,
+            hasComplimentaryAccess: true
           }
         },
         payments: {
@@ -131,7 +133,14 @@ class VideosService {
       return { eligible: false, reason: 'Register your seller profile before uploading videos.' };
     }
     if (account.sellerProfile.status !== 'APPROVED' || !account.sellerProfile.isVerified) {
-      return { eligible: false, reason: 'Your shop must be approved before publishing videos.' };
+      return { eligible: false, reason: 'Your seller profile must be approved before publishing videos.' };
+    }
+    if (account.sellerProfile.hasComplimentaryAccess) {
+      return {
+        eligible: true,
+        reason: 'Your seller account has complimentary access.',
+        sellerName: account.sellerProfile.shopName
+      };
     }
     const trialEndsAt = new Date(account.sellerProfile.createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
     const freeTrialActive = now < trialEndsAt;
@@ -161,22 +170,24 @@ class VideosService {
       throw new ServiceUnavailableException('Videos are unavailable while the database is offline.');
     }
 
-    const videos = await this.prisma.video.findMany({
-      where: { sellerProfile: { is: { status: 'APPROVED', isVerified: true } } },
-      include: { sellerProfile: { select: { shopName: true, isVerified: true, bio: true, shop: { select: { city: true } } } } },
-      orderBy: { createdAt: 'desc' }
-    });
+    return this.cache.getOrSet('public:videos', 5_000, async () => {
+      const videos = await this.prisma.video.findMany({
+        where: { sellerProfile: { is: { status: 'APPROVED', isVerified: true } } },
+        include: { sellerProfile: { select: { shopName: true, isVerified: true, bio: true, shop: { select: { city: true } } } } },
+        orderBy: { createdAt: 'desc' }
+      });
 
-    return videos.map((video) => ({
-      ...video,
-      videoUrl: video.videoUrl.startsWith('/uploads/')
-        ? `${apiConfig.publicUrl}${video.videoUrl}`
-        : video.videoUrl,
-      seller: video.sellerProfile.shopName,
-      sellerVerified: video.sellerProfile.isVerified,
-      sellerBio: video.sellerProfile.bio,
-      sellerCity: video.sellerProfile.shop?.city
-    }));
+      return videos.map((video) => ({
+        ...video,
+        videoUrl: video.videoUrl.startsWith('/uploads/')
+          ? `${apiConfig.publicUrl}${video.videoUrl}`
+          : video.videoUrl,
+        seller: video.sellerProfile.shopName,
+        sellerVerified: video.sellerProfile.isVerified,
+        sellerBio: video.sellerProfile.bio,
+        sellerCity: video.sellerProfile.shop?.city
+      }));
+    });
   }
 
   async create(user: AuthenticatedUser, input: VideoInput, uploadedUrl: string, filePath: string) {

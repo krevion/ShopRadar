@@ -1,11 +1,22 @@
 'use client';
 
-import { type FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SiteShell } from '@/components/site-shell';
+import { CatalogImage } from '@/components/catalog-image';
+import Image from 'next/image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 type Product = { id: string; name: string; category: string; price: number; shop: string; city: string | null; stock: number };
 type Category = { id: string; name: string };
+
+const discoveryCategories = [
+  { title: 'Fresh from the market', detail: 'Everyday produce and pantry picks', query: 'groceries', image: '/images/catalog/groceries.jpg', alt: 'Fresh fruit and vegetables at a market' },
+  { title: 'Everyday style', detail: 'Clothes, shoes and accessories', query: 'fashion', image: '/images/catalog/footwear.jpg', alt: 'A colorful everyday sneaker' },
+  { title: 'Tech for daily life', detail: 'Phones, audio and useful gadgets', query: 'electronics', image: '/images/catalog/tech.jpg', alt: 'A laptop ready for everyday work' },
+  { title: 'Make home yours', detail: 'Thoughtful finds for every room', query: 'home', image: '/images/catalog/interiors.jpg', alt: 'A warm, sunlit living room' },
+  { title: 'A little self-care', detail: 'Beauty picks and personal essentials', query: 'beauty', image: '/images/catalog/skincare.jpg', alt: 'A simple skincare routine' },
+  { title: 'Coffee and small treats', detail: 'Local flavors for a slower moment', query: 'coffee', image: '/images/catalog/coffee.jpg', alt: 'Coffee being prepared at a neighborhood cafe' }
+];
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,11 +42,6 @@ export default function HomePage() {
     return () => controller.abort();
   }, []);
 
-  const search = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    window.location.href = `/search?q=${encodeURIComponent(query.trim())}`;
-  };
-
   return (
     <SiteShell
       title="Find it. Compare it. Get it."
@@ -45,8 +51,8 @@ export default function HomePage() {
       <div className="shopradar-home-layout">
         <section className="shopradar-hero-panel">
           <div className="shopradar-hero-copy">
-            <form className="shopradar-search-bar" onSubmit={search}>
-              <input aria-label="What are you looking for?" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="What are you looking for?" maxLength={100} />
+            <form className="shopradar-search-bar" action="/search" method="get">
+              <input name="q" aria-label="What are you looking for?" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="What are you looking for?" maxLength={100} required />
               <div className="shopradar-search-meta">
                 <span>Search shops across Kenya</span>
                 <button type="submit">Search</button>
@@ -61,11 +67,33 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="shopradar-hero-visual" aria-hidden="true">
-            <div className="phone-card">
-              <div className="phone-header"><span className="dot red" /><span className="dot amber" /><span className="dot green" /></div>
-              <div className="phone-body"><div className="mini-product" /></div>
+          <div className="shopradar-hero-visual">
+            <div className="shopradar-hero-photo">
+              <Image src="/images/catalog/groceries.jpg" alt="Fresh produce at a local market" fill priority sizes="(max-width: 760px) 100vw, 40vw" style={{ objectFit: 'cover' }} />
+              <div className="shopradar-hero-photo-caption"><span>Shop local</span><strong>Find fresh picks nearby</strong></div>
             </div>
+            <div className="shopradar-hero-float-photo"><Image src="/images/catalog/fashion.jpg" alt="" fill sizes="160px" style={{ objectFit: 'cover' }} /></div>
+          </div>
+        </section>
+
+        <section className="shopradar-discovery-section" aria-labelledby="shopradar-discovery-title">
+          <div className="shopradar-discovery-heading">
+            <div>
+              <span className="shopradar-discovery-kicker">A good place to start</span>
+              <h2 id="shopradar-discovery-title">What are you in the mood for?</h2>
+            </div>
+            <p>Explore everyday finds from shops around you.</p>
+          </div>
+          <div className="shopradar-discovery-grid">
+            {discoveryCategories.map((category) => (
+              <a className="shopradar-discovery-card" key={category.query} href={`/search?q=${encodeURIComponent(category.query)}`}>
+                <Image src={category.image} alt={category.alt} fill sizes="(max-width: 520px) 46vw, (max-width: 900px) 30vw, 16vw" />
+                <span className="shopradar-discovery-card-copy">
+                  <strong>{category.title}</strong>
+                  <span>{category.detail}</span>
+                </span>
+              </a>
+            ))}
           </div>
         </section>
 
@@ -75,15 +103,13 @@ export default function HomePage() {
             <a href="/products">View all</a>
           </div>
 
-          {loading ? <p>Loading live products?</p> : null}
+          {loading ? <p>Finding the latest listings…</p> : null}
           {error ? <p role="alert" style={{ color: '#b91c1c' }}>{error}</p> : null}
           {!loading && !error && products.length === 0 ? <p style={{ color: '#64748b' }}>No approved shops have listed products yet. Check back soon.</p> : null}
           <div className="shopradar-product-grid">
             {products.slice(0, 4).map((product) => (
               <article key={product.id} className="shopradar-product-card">
-                <div className="shopradar-product-art" aria-hidden="true">
-                  <span>{product.category.slice(0, 1).toUpperCase()}</span>
-                </div>
+                <CatalogImage category={product.category} height={150} />
                 <div className="shopradar-product-info">
                   <div className="shopradar-product-head">
                     <span>{product.name}</span>
@@ -91,7 +117,7 @@ export default function HomePage() {
                   </div>
                   <div className="shopradar-product-meta">
                     <strong>{formatPrice(product.price)}</strong>
-                    <span>{product.shop}{product.city ? ` ? ${product.city}` : ''}</span>
+                    <span>{product.shop}{product.city ? ` · ${product.city}` : ''}</span>
                   </div>
                 </div>
               </article>
@@ -111,8 +137,8 @@ export default function HomePage() {
 
         <section className="shopradar-dashboard-grid">
           <a className="shopradar-panel shopradar-analytics-panel" href="/seller/register">
-            <div className="shopradar-panel-header"><div><span className="shopradar-panel-label">For business owners</span><h3>Bring your shop online</h3></div><span aria-hidden="true">?</span></div>
-            <p>Register your business, add products, and help nearby customers find your shop.</p>
+            <div className="shopradar-panel-header"><div><span className="shopradar-panel-label">For local businesses and professionals</span><h3>Bring your business online</h3></div><span aria-hidden="true">?</span></div>
+            <p>Register a shop or offer a local service, then help nearby customers find and contact you.</p>
           </a>
           <a className="shopradar-panel shopradar-payments-panel" href="/videos">
             <div className="shopradar-panel-header"><div><span className="shopradar-panel-label">Shop discovery</span><h3>See products in motion</h3></div><span aria-hidden="true">?</span></div>

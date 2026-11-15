@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { SiteShell } from '@/components/site-shell';
+import { CatalogImage } from '@/components/catalog-image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -54,9 +55,7 @@ export default function ProductsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
           {visibleProducts.map((product) => (
             <article key={product.id} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 18, padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-              <div aria-hidden="true" style={{ height: 160, borderRadius: 14, display: 'grid', placeItems: 'center', background: 'linear-gradient(140deg, #082f49, #0e7490 58%, #f97316)', color: 'white', fontSize: '3rem', fontWeight: 900 }}>
-                {product.name.slice(0, 1).toUpperCase()}
-              </div>
+              <CatalogImage category={product.category} rounded />
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontWeight: 800 }}>{product.name}</div>

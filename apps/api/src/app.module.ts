@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
@@ -19,6 +20,7 @@ import { DatabaseModule } from './common/database.module';
 @Module({
   imports: [
     DatabaseModule,
+    AnalyticsModule,
     ProductsModule,
     ShopsModule,
     SellersModule,

@@ -8,6 +8,8 @@ import { ShopLocationMap, type ShopLocation } from '@/components/shop-location-m
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+type ProviderType = 'SHOP' | 'SERVICE_PROVIDER';
+
 async function getErrorMessage(response: Response) {
   const body = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
   return Array.isArray(body?.message) ? body.message.join(' ') : body?.message ?? `Request failed (${response.status}).`;
@@ -16,9 +18,13 @@ async function getErrorMessage(response: Response) {
 export default function SellerRegisterPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'register' | 'login'>('register');
+  const [providerType, setProviderType] = useState<ProviderType>('SHOP');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [shopName, setShopName] = useState('');
+  const [serviceCategory, setServiceCategory] = useState('');
+  const [serviceArea, setServiceArea] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [bio, setBio] = useState('');
   const [address, setAddress] = useState<SellerAddressDetails>({ buildingName: '', roomNumber: '', street: '' });
   const [location, setLocation] = useState<ShopLocation | null>(null);
@@ -32,7 +38,7 @@ export default function SellerRegisterPage() {
 
     try {
       if (mode === 'register' && !location) {
-        throw new Error('Choose your shop location on the map before creating your seller account.');
+        throw new Error('Choose a location on the map before creating your seller account.');
       }
       const authResponse = await fetch(`${API_URL}/api/auth/${mode === 'register' ? 'register' : 'login'}`, {
         method: 'POST',
@@ -58,7 +64,15 @@ export default function SellerRegisterPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${auth.accessToken}`
           },
-          body: JSON.stringify({ shopName, bio, ...address, ...location })
+          body: JSON.stringify({
+            providerType,
+            shopName,
+            bio,
+            ...location,
+            ...(providerType === 'SHOP'
+              ? address
+              : { serviceCategory, serviceArea, contactPhone })
+          })
         });
         if (!profileResponse.ok) throw new Error(await getErrorMessage(profileResponse));
         router.push('/seller/checkout');
@@ -75,8 +89,8 @@ export default function SellerRegisterPage() {
         return;
       }
       if (access.reason.startsWith('Register your seller profile')) {
-        if (!shopName.trim()) throw new Error('Enter your business name to complete seller registration.');
-        if (!location) throw new Error('Choose your shop location on the map to complete seller registration.');
+        if (!shopName.trim()) throw new Error('Enter your business or service name to complete seller registration.');
+        if (!location) throw new Error('Choose a location on the map to complete seller registration.');
         const profileResponse = await fetch(`${API_URL}/api/sellers/profile`, {
           method: 'POST',
           headers: {
@@ -99,12 +113,12 @@ export default function SellerRegisterPage() {
 
   return (
     <SiteShell
-      title={mode === 'register' ? 'Register your business' : 'Seller sign in'}
-      subtitle={mode === 'register' ? 'Create a seller account and submit your shop for verification.' : 'Sign in to check your seller subscription and video access.'}
+      title={mode === 'register' ? 'Register your business or service' : 'Seller sign in'}
+      subtitle={mode === 'register' ? 'Register a shop or an individual service and submit your profile for verification.' : 'Sign in to check your seller subscription and video access.'}
     >
       <div style={{ maxWidth: 720, margin: '0 auto', display: 'grid', gap: '1rem' }}>
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 16, padding: '1rem 1.2rem', color: '#9a4d00' }}>
-          <strong>Seller subscription:</strong> new seller profiles get a one-month free trial. After the trial, a confirmed KSh 1,000 payment continues your full ShopRadar seller experience, including shop and product tools, shopper engagement, and video promotion.
+          <strong>Seller subscription:</strong> shops and individual service providers get the same one-month free trial, then a confirmed KSh 1,000 payment continues the seller subscription for 30 days.
         </div>
 
         <form onSubmit={handleSubmit} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 18, padding: '1.25rem', display: 'grid', gap: '1rem' }}>
@@ -112,6 +126,16 @@ export default function SellerRegisterPage() {
             <button type="button" onClick={() => { setMode('register'); setStatus(''); }} style={modeButtonStyle(mode === 'register')}>Register</button>
             <button type="button" onClick={() => { setMode('login'); setStatus(''); }} style={modeButtonStyle(mode === 'login')}>Sign in</button>
           </div>
+
+          {mode === 'register' ? (
+            <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: '0.55rem' }}>
+              <legend style={{ ...labelStyle, marginBottom: '0.55rem' }}>What are you registering?</legend>
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <button type="button" aria-pressed={providerType === 'SHOP'} onClick={() => setProviderType('SHOP')} style={modeButtonStyle(providerType === 'SHOP')}>Shop or business</button>
+                <button type="button" aria-pressed={providerType === 'SERVICE_PROVIDER'} onClick={() => setProviderType('SERVICE_PROVIDER')} style={modeButtonStyle(providerType === 'SERVICE_PROVIDER')}>Individual service provider</button>
+              </div>
+            </fieldset>
+          ) : null}
 
           <label style={labelStyle}>
             Email
@@ -124,19 +148,38 @@ export default function SellerRegisterPage() {
           </label>
 
           <label style={labelStyle}>
-            Business name {mode === 'login' ? <span style={{ color: '#64748b', fontWeight: 400 }}>(only needed if you have not registered your shop)</span> : null}
-            <input required={mode === 'register'} maxLength={120} value={shopName} onChange={(event) => setShopName(event.target.value)} placeholder="Your shop name" style={inputStyle} />
+            {providerType === 'SHOP' ? 'Business name' : 'Your name or service name'} {mode === 'login' ? <span style={{ color: '#64748b', fontWeight: 400 }}>(only needed if you have not registered your profile)</span> : null}
+            <input required={mode === 'register'} maxLength={120} value={shopName} onChange={(event) => setShopName(event.target.value)} placeholder={providerType === 'SHOP' ? 'Your shop or business name' : 'e.g. Juma Plumbing'} style={inputStyle} />
           </label>
           {mode === 'register' ? (
-            <label style={labelStyle}>
-              About your shop <span style={{ color: '#64748b', fontWeight: 400 }}>(optional)</span>
-              <textarea maxLength={500} rows={3} value={bio} onChange={(event) => setBio(event.target.value)} placeholder="What do you sell?" style={{ ...inputStyle, resize: 'vertical' }} />
-            </label>
+            <>
+              {providerType === 'SERVICE_PROVIDER' ? (
+                <>
+                  <label style={labelStyle}>
+                    Service category
+                    <input required maxLength={80} value={serviceCategory} onChange={(event) => setServiceCategory(event.target.value)} placeholder="e.g. Plumbing, house cleaning, electrical" style={inputStyle} />
+                  </label>
+                  <label style={labelStyle}>
+                    Phone or WhatsApp number
+                    <input required type="tel" inputMode="tel" autoComplete="tel" maxLength={16} pattern="(\+?254|0)?[17][0-9]{8}" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} placeholder="0712345678" style={inputStyle} />
+                  </label>
+                  <label style={labelStyle}>
+                    Service area
+                    <input required maxLength={200} value={serviceArea} onChange={(event) => setServiceArea(event.target.value)} placeholder="e.g. Kilimani, Lavington and nearby areas" style={inputStyle} />
+                  </label>
+                </>
+              ) : null}
+              <label style={labelStyle}>
+                {providerType === 'SHOP' ? 'About your business' : 'Describe your services'} <span style={{ color: '#64748b', fontWeight: 400 }}>(optional)</span>
+                <textarea maxLength={500} rows={3} value={bio} onChange={(event) => setBio(event.target.value)} placeholder={providerType === 'SHOP' ? 'What do you sell?' : 'What services do you offer?'} style={{ ...inputStyle, resize: 'vertical' }} />
+              </label>
+            </>
           ) : null}
 
           <div style={{ display: 'grid', gap: '0.55rem' }}>
-            <strong>Shop location {mode === 'login' ? <span style={{ color: '#64748b', fontWeight: 400 }}>(needed only if you have not registered your shop)</span> : null}</strong>
-            {mode === 'register' ? <SellerAddressFields value={address} onChange={setAddress} /> : null}
+            <strong>{providerType === 'SHOP' ? 'Shop location' : 'Service area location'} {mode === 'login' ? <span style={{ color: '#64748b', fontWeight: 400 }}>(needed only if you have not registered your profile)</span> : null}</strong>
+            {mode === 'register' && providerType === 'SHOP' ? <SellerAddressFields value={address} onChange={setAddress} /> : null}
+            {mode === 'register' && providerType === 'SERVICE_PROVIDER' ? <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', lineHeight: 1.5 }}>Choose an approximate center for your service area. This map location is public; do not select your home address if you do not want it shown.</p> : null}
             <ShopLocationMap selectedLocation={location} onLocationSelect={setLocation} height={320} />
             {location ? <span style={{ color: '#166534', fontSize: '0.86rem' }}>Location selected: {location.locationLabel ?? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`}</span> : null}
           </div>
@@ -148,7 +191,7 @@ export default function SellerRegisterPage() {
         </form>
 
         <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem', lineHeight: 1.55 }}>
-          A submitted M-Pesa request is not treated as payment. Your free trial starts when you register your business; after that, a 30-day paid subscription activates only after Safaricom confirms payment. Shop approval is reviewed separately.
+          A submitted M-Pesa request is not treated as payment. Your free trial starts when you register; after that, a 30-day paid subscription activates only after Safaricom confirms payment. Profile approval is reviewed separately.
         </p>
       </div>
     </SiteShell>
